@@ -7,6 +7,7 @@ set -e  # 遇到错误立即退出
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_NAME="anything-to-notebooklm"
+VENV_DIR="$SKILL_DIR/.venv"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -37,9 +38,23 @@ fi
 
 echo -e "${GREEN}✅ Python $PYTHON_VERSION${NC}"
 
-# 2. 检查并克隆 wexin-read-mcp
+# 2. 创建虚拟环境
 echo ""
-echo -e "${YELLOW}[2/6] 安装 MCP 服务器...${NC}"
+echo -e "${YELLOW}[2/7] 创建虚拟环境...${NC}"
+if [ -d "$VENV_DIR" ]; then
+    echo -e "${GREEN}✅ 虚拟环境已存在${NC}"
+else
+    python3 -m venv "$VENV_DIR"
+    echo -e "${GREEN}✅ 虚拟环境创建完成${NC}"
+fi
+
+source "$VENV_DIR/bin/activate"
+pip install --upgrade pip -q
+echo -e "${GREEN}✅ 虚拟环境已激活${NC}"
+
+# 3. 检查并克隆 wexin-read-mcp
+echo ""
+echo -e "${YELLOW}[3/7] 安装 MCP 服务器...${NC}"
 MCP_DIR="$SKILL_DIR/wexin-read-mcp"
 
 if [ -d "$MCP_DIR" ]; then
@@ -50,28 +65,28 @@ else
     echo -e "${GREEN}✅ MCP 服务器克隆完成${NC}"
 fi
 
-# 3. 安装 Python 依赖
+# 4. 安装 Python 依赖
 echo ""
-echo -e "${YELLOW}[3/6] 安装 Python 依赖...${NC}"
+echo -e "${YELLOW}[4/7] 安装 Python 依赖...${NC}"
 
 # 安装 MCP 服务器依赖
 if [ -f "$MCP_DIR/requirements.txt" ]; then
     echo "安装 MCP 依赖..."
-    pip3 install -r "$MCP_DIR/requirements.txt" -q
+    pip install -r "$MCP_DIR/requirements.txt" -q
     echo -e "${GREEN}✅ MCP 依赖安装完成${NC}"
 fi
 
 # 安装 Skill 依赖（包括 markitdown）
 if [ -f "$SKILL_DIR/requirements.txt" ]; then
     echo "安装 Skill 依赖（包括 markitdown 文件转换工具）..."
-    pip3 install -r "$SKILL_DIR/requirements.txt" -q
+    pip install -r "$SKILL_DIR/requirements.txt" -q
     echo -e "${GREEN}✅ Skill 依赖安装完成${NC}"
     echo -e "${GREEN}✅ markitdown 已安装（支持 15+ 文件格式转换）${NC}"
 fi
 
-# 4. 安装 Playwright 浏览器
+# 5. 安装 Playwright 浏览器
 echo ""
-echo -e "${YELLOW}[4/6] 安装 Playwright 浏览器...${NC}"
+echo -e "${YELLOW}[5/7] 安装 Playwright 浏览器...${NC}"
 echo "这可能需要几分钟，请耐心等待..."
 
 if python3 -c "from playwright.sync_api import sync_playwright" 2>/dev/null; then
@@ -82,34 +97,34 @@ else
     exit 1
 fi
 
-# 5. 检查并安装 notebooklm
+# 6. 检查并安装 notebooklm
 echo ""
-echo -e "${YELLOW}[5/6] 检查 NotebookLM CLI...${NC}"
+echo -e "${YELLOW}[6/7] 检查 NotebookLM CLI...${NC}"
 
 if command -v notebooklm &> /dev/null; then
     NOTEBOOKLM_VERSION=$(notebooklm --version 2>/dev/null || echo "unknown")
     echo -e "${GREEN}✅ NotebookLM CLI 已安装 ($NOTEBOOKLM_VERSION)${NC}"
 else
     echo "正在安装 notebooklm-py..."
-    pip3 install git+https://github.com/teng-lin/notebooklm-py.git -q
+    pip install git+https://github.com/teng-lin/notebooklm-py.git -q
 
     if command -v notebooklm &> /dev/null; then
         echo -e "${GREEN}✅ NotebookLM CLI 安装完成${NC}"
     else
         echo -e "${RED}❌ NotebookLM CLI 安装失败${NC}"
-        echo "请手动安装：pip3 install git+https://github.com/teng-lin/notebooklm-py.git"
+        echo "请手动安装：pip install git+https://github.com/teng-lin/notebooklm-py.git"
         exit 1
     fi
 fi
 
-# 6. 配置指导
+# 7. 配置指导
 echo ""
-echo -e "${YELLOW}[6/6] 配置指导${NC}"
+echo -e "${YELLOW}[7/7] 配置指导${NC}"
 echo ""
 
 CLAUDE_CONFIG="$HOME/.claude/config.json"
 CONFIG_SNIPPET="    \"weixin-reader\": {
-      \"command\": \"python\",
+      \"command\": \"$VENV_DIR/bin/python\",
       \"args\": [
         \"$MCP_DIR/src/server.py\"
       ]
@@ -146,8 +161,8 @@ echo ""
 echo -e "${BLUE}🔐 NotebookLM 认证${NC}"
 echo ""
 echo "首次使用前，请运行："
-echo -e "${GREEN}  notebooklm login${NC}"
-echo -e "${GREEN}  notebooklm list  # 验证认证成功${NC}"
+echo -e "${GREEN}  $VENV_DIR/bin/notebooklm login${NC}"
+echo -e "${GREEN}  $VENV_DIR/bin/notebooklm list  # 验证认证成功${NC}"
 echo ""
 
 # 最终检查
