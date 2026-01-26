@@ -40,7 +40,7 @@ echo -e "${GREEN}✅ Python $PYTHON_VERSION${NC}"
 
 # 2. 创建虚拟环境
 echo ""
-echo -e "${YELLOW}[2/7] 创建虚拟环境...${NC}"
+echo -e "${YELLOW}[2/8] 创建虚拟环境...${NC}"
 if [ -d "$VENV_DIR" ]; then
     echo -e "${GREEN}✅ 虚拟环境已存在${NC}"
 else
@@ -54,7 +54,7 @@ echo -e "${GREEN}✅ 虚拟环境已激活${NC}"
 
 # 3. 检查并克隆 wexin-read-mcp
 echo ""
-echo -e "${YELLOW}[3/7] 安装 MCP 服务器...${NC}"
+echo -e "${YELLOW}[3/8] 安装 MCP 服务器...${NC}"
 MCP_DIR="$SKILL_DIR/wexin-read-mcp"
 
 if [ -d "$MCP_DIR" ]; then
@@ -67,29 +67,34 @@ fi
 
 # 4. 安装 Python 依赖
 echo ""
-echo -e "${YELLOW}[4/7] 安装 Python 依赖...${NC}"
+echo -e "${YELLOW}[4/8] 安装 Python 依赖...${NC}"
 
-# 安装 MCP 服务器依赖
-if [ -f "$MCP_DIR/requirements.txt" ]; then
+# 检查 MCP 依赖
+if python -c "import mcp" 2>/dev/null; then
+    echo -e "${GREEN}✅ MCP 依赖已安装${NC}"
+elif [ -f "$MCP_DIR/requirements.txt" ]; then
     echo "安装 MCP 依赖..."
     pip install -r "$MCP_DIR/requirements.txt" -q
     echo -e "${GREEN}✅ MCP 依赖安装完成${NC}"
 fi
 
-# 安装 Skill 依赖（包括 markitdown）
-if [ -f "$SKILL_DIR/requirements.txt" ]; then
+# 检查 Skill 依赖
+if python -c "import markitdown; import playwright" 2>/dev/null; then
+    echo -e "${GREEN}✅ Skill 依赖已安装${NC}"
+elif [ -f "$SKILL_DIR/requirements.txt" ]; then
     echo "安装 Skill 依赖（包括 markitdown 文件转换工具）..."
     pip install -r "$SKILL_DIR/requirements.txt" -q
     echo -e "${GREEN}✅ Skill 依赖安装完成${NC}"
-    echo -e "${GREEN}✅ markitdown 已安装（支持 15+ 文件格式转换）${NC}"
 fi
 
 # 5. 安装 Playwright 浏览器
 echo ""
-echo -e "${YELLOW}[5/7] 安装 Playwright 浏览器...${NC}"
-echo "这可能需要几分钟，请耐心等待..."
+echo -e "${YELLOW}[5/8] 安装 Playwright 浏览器...${NC}"
 
-if python3 -c "from playwright.sync_api import sync_playwright" 2>/dev/null; then
+if ls "$HOME/Library/Caches/ms-playwright/chromium"* &>/dev/null; then
+    echo -e "${GREEN}✅ Playwright 浏览器已安装${NC}"
+elif python3 -c "from playwright.sync_api import sync_playwright" 2>/dev/null; then
+    echo "安装 Chromium 浏览器..."
     playwright install chromium
     echo -e "${GREEN}✅ Playwright 浏览器安装完成${NC}"
 else
@@ -99,16 +104,16 @@ fi
 
 # 6. 检查并安装 notebooklm
 echo ""
-echo -e "${YELLOW}[6/7] 检查 NotebookLM CLI...${NC}"
+echo -e "${YELLOW}[6/8] 检查 NotebookLM CLI...${NC}"
 
-if command -v notebooklm &> /dev/null; then
-    NOTEBOOKLM_VERSION=$(notebooklm --version 2>/dev/null || echo "unknown")
+if [ -f "$VENV_DIR/bin/notebooklm" ]; then
+    NOTEBOOKLM_VERSION=$("$VENV_DIR/bin/notebooklm" --version 2>/dev/null || echo "unknown")
     echo -e "${GREEN}✅ NotebookLM CLI 已安装 ($NOTEBOOKLM_VERSION)${NC}"
 else
     echo "正在安装 notebooklm-py..."
     pip install git+https://github.com/teng-lin/notebooklm-py.git -q
 
-    if command -v notebooklm &> /dev/null; then
+    if [ -f "$VENV_DIR/bin/notebooklm" ]; then
         echo -e "${GREEN}✅ NotebookLM CLI 安装完成${NC}"
     else
         echo -e "${RED}❌ NotebookLM CLI 安装失败${NC}"
@@ -117,9 +122,24 @@ else
     fi
 fi
 
-# 7. 配置指导
+# 7. 检查 bilibili-subtitle（可选）
 echo ""
-echo -e "${YELLOW}[7/7] 配置指导${NC}"
+echo -e "${YELLOW}[7/8] 检查 bilibili-subtitle（可选）...${NC}"
+
+BILIBILI_SKILL_DIR="$HOME/.agents/skills/bilibili-subtitle"
+if [ -d "$BILIBILI_SKILL_DIR" ] && [ -f "$BILIBILI_SKILL_DIR/.venv/bin/python" ]; then
+    echo -e "${GREEN}✅ bilibili-subtitle 已安装${NC}"
+elif [ -d "$BILIBILI_SKILL_DIR" ] && [ -f "$BILIBILI_SKILL_DIR/install.sh" ]; then
+    echo "安装 bilibili-subtitle（B站视频支持）..."
+    (cd "$BILIBILI_SKILL_DIR" && ./install.sh)
+    echo -e "${GREEN}✅ bilibili-subtitle 安装完成${NC}"
+else
+    echo -e "${YELLOW}⚠️  bilibili-subtitle 目录不存在，跳过${NC}"
+fi
+
+# 8. 配置指导
+echo ""
+echo -e "${YELLOW}[8/8] 配置指导${NC}"
 echo ""
 
 CLAUDE_CONFIG="$HOME/.claude/config.json"

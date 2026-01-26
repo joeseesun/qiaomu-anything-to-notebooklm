@@ -14,6 +14,7 @@ homepage: https://github.com/joeseesun/anything-to-notebooklm
 | 任务 | 命令/工具 |
 |------|----------|
 | 抓取微信文章 | MCP `read_weixin_article` |
+| 提取B站字幕 | `python -m bilibili_subtitle "URL" -o /tmp` |
 | 转换文档 | `markitdown /path/to/file -o /tmp/output.md` |
 | 创建笔记本 | `notebooklm create "Title" --json` |
 | 上传文件 | `notebooklm source add file.txt --notebook <id> --wait` |
@@ -66,6 +67,9 @@ homepage: https://github.com/joeseesun/anything-to-notebooklm
 ### 11. 搜索关键词
 通过 Web Search 搜索关键词，汇总多个来源的信息
 
+### 12. Bilibili 视频
+通过 bilibili-subtitle 工具提取字幕或转录音频，生成文字稿
+
 ## 前置条件
 
 ### 1. 安装 wexin-read-mcp
@@ -116,6 +120,10 @@ notebooklm list  # 验证认证成功
 ### YouTube 视频
 - "把这个YouTube视频做成播客 [YouTube URL]"
 - "这个视频帮我生成思维导图 [YouTube URL]"
+
+### Bilibili 视频
+- "把这个B站视频做成播客 [Bilibili URL]"
+- "这个B站视频帮我生成PPT [BV号]"
 
 ### 本地文件
 - "把这个PDF上传到NotebookLM /path/to/file.pdf"
@@ -214,6 +222,7 @@ Claude 自动识别输入类型：
 |---------|-------|---------|
 | `https://mp.weixin.qq.com/s/` | 微信公众号 | MCP 工具抓取 |
 | `https://youtube.com/...` 或 `https://youtu.be/...` | YouTube | 直接传递给 NotebookLM |
+| `https://bilibili.com/...` 或 `BV1xxx` | Bilibili 视频 | bilibili-subtitle 提取 → TXT |
 | `https://` 或 `http://` | 网页 | 直接传递给 NotebookLM |
 | `/path/to/file.pdf` | PDF 文件 | markitdown 转 Markdown → TXT |
 | `/path/to/file.epub` | EPUB 电子书 | markitdown 转 Markdown → TXT |
@@ -236,6 +245,11 @@ Claude 自动识别输入类型：
 **网页/YouTube**：
 - 直接使用 URL 调用 `notebooklm source add [URL]`
 - NotebookLM 自动提取内容
+
+**Bilibili 视频**：
+- 使用 bilibili-subtitle 提取字幕/转录
+- 命令：`python -m bilibili_subtitle "URL" -o /tmp --skip-summary`
+- 保存为 TXT：`/tmp/{video_id}.transcript.md`
 
 **Office 文档/电子书/PDF**：
 - 使用 markitdown 转换为 Markdown
@@ -642,6 +656,33 @@ https://mp.weixin.qq.com/s/abc123
 ```
 
 → 生成思维导图，一目了然
+
+### 示例 7：Bilibili 视频 → 播客
+
+**用户输入**：
+```
+把这个B站视频做成播客 https://www.bilibili.com/video/BV1234567890/
+```
+
+**执行流程**：
+1. 识别为 Bilibili 链接
+2. bilibili-subtitle 提取字幕/转录
+3. 保存为 TXT
+4. 上传到 NotebookLM
+5. 生成播客
+
+**输出**：
+```
+✅ B站视频已转换为播客！
+
+🎬 视频：深度学习入门教程
+⏱️ 时长：45 分钟
+
+🎙️ 播客已生成：
+📁 文件：/tmp/bilibili_BV1234567890_podcast.mp3
+⏱️ 时长：约 12 分钟
+📊 大小：18.5 MB
+```
 
 ---
 
