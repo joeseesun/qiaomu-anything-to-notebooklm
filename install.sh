@@ -16,6 +16,87 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+get_bbdown_target() {
+    local os arch
+    os="$(uname -s)"
+    arch="$(uname -m)"
+
+    case "$os" in
+        Darwin)
+            case "$arch" in
+                arm64|aarch64) echo "osx-arm64" ;;
+                x86_64) echo "osx-x64" ;;
+                *) return 1 ;;
+            esac
+            ;;
+        Linux)
+            case "$arch" in
+                arm64|aarch64) echo "linux-arm64" ;;
+                x86_64) echo "linux-x64" ;;
+                *) return 1 ;;
+            esac
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+ensure_bbdown() {
+    if command -v BBDown &> /dev/null; then
+        local version
+        version=$(BBDown --help 2>&1 | head -n1 | grep -o 'version [0-9.]*' || echo "installed")
+        echo -e "${GREEN}✅ BBDown 已安装 ($version)${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}⚠️  未检测到 BBDown，尝试自动安装...${NC}"
+
+    if ! command -v curl &> /dev/null || ! command -v unzip &> /dev/null; then
+        echo -e "${YELLOW}⚠️  缺少 curl 或 unzip，无法自动安装 BBDown${NC}"
+        echo "请手动安装: https://github.com/nilaoda/BBDown/releases"
+        return 1
+    fi
+
+    local target release_json download_url tmp_zip install_bin
+    target="$(get_bbdown_target || true)"
+    if [ -z "$target" ]; then
+        echo -e "${YELLOW}⚠️  当前系统暂不支持自动安装 BBDown（$(uname -s)-$(uname -m)）${NC}"
+        echo "请手动安装: https://github.com/nilaoda/BBDown/releases"
+        return 1
+    fi
+
+    release_json="$(curl -fsSL "https://api.github.com/repos/nilaoda/BBDown/releases/latest" || true)"
+    download_url="$(printf '%s' "$release_json" | grep -o "\"browser_download_url\": \"[^\"]*_${target}\\.zip\"" | cut -d'"' -f4 | head -n1)"
+    if [ -z "$download_url" ]; then
+        echo -e "${YELLOW}⚠️  获取 BBDown 下载链接失败${NC}"
+        echo "请手动安装: https://github.com/nilaoda/BBDown/releases"
+        return 1
+    fi
+
+    tmp_zip="/tmp/BBDown_${target}.zip"
+    install_bin="$HOME/.local/bin"
+    mkdir -p "$install_bin"
+
+    if curl -fsSL "$download_url" -o "$tmp_zip" && unzip -q -o "$tmp_zip" -d "$install_bin" 2>/dev/null; then
+        chmod +x "$install_bin/BBDown" 2>/dev/null || true
+        if [ -f "$install_bin/BBDown" ] && [ ! -f "$install_bin/bbdown" ]; then
+            ln -sf "$install_bin/BBDown" "$install_bin/bbdown"
+        fi
+        rm -f "$tmp_zip"
+        echo -e "${GREEN}✅ BBDown 自动安装完成${NC}"
+        if [[ ":$PATH:" != *":$install_bin:"* ]]; then
+            echo -e "${YELLOW}⚠️  请将 $install_bin 添加到 PATH${NC}"
+        fi
+        return 0
+    fi
+
+    rm -f "$tmp_zip"
+    echo -e "${YELLOW}⚠️  BBDown 自动安装失败${NC}"
+    echo "请手动安装: https://github.com/nilaoda/BBDown/releases"
+    return 1
+}
+
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}  多源内容 → NotebookLM 安装程序${NC}"
 echo -e "${BLUE}========================================${NC}"
@@ -122,19 +203,29 @@ else
     fi
 fi
 
-# 7. 检查 bilibili-subtitle（可选）
+# 7. 检查 bilibili-subtitle / BBDown（可选）
 echo ""
-echo -e "${YELLOW}[7/8] 检查 bilibili-subtitle（可选）...${NC}"
+echo -e "${YELLOW}[7/8] 检查 bilibili-subtitle / BBDown（可选）...${NC}"
 
 BILIBILI_SKILL_DIR="$HOME/.agents/skills/bilibili-subtitle"
+BILIBILI_AVAILABLE=0
 if [ -d "$BILIBILI_SKILL_DIR" ] && [ -f "$BILIBILI_SKILL_DIR/.venv/bin/python" ]; then
     echo -e "${GREEN}✅ bilibili-subtitle 已安装${NC}"
+    BILIBILI_AVAILABLE=1
 elif [ -d "$BILIBILI_SKILL_DIR" ] && [ -f "$BILIBILI_SKILL_DIR/install.sh" ]; then
     echo "安装 bilibili-subtitle（B站视频支持）..."
-    (cd "$BILIBILI_SKILL_DIR" && ./install.sh)
-    echo -e "${GREEN}✅ bilibili-subtitle 安装完成${NC}"
+    if (cd "$BILIBILI_SKILL_DIR" && ./install.sh); then
+        echo -e "${GREEN}✅ bilibili-subtitle 安装完成${NC}"
+        BILIBILI_AVAILABLE=1
+    else
+        echo -e "${YELLOW}⚠️  bilibili-subtitle 安装失败，已跳过 B 站增强依赖安装${NC}"
+    fi
 else
     echo -e "${YELLOW}⚠️  bilibili-subtitle 目录不存在，跳过${NC}"
+fi
+
+if [ "$BILIBILI_AVAILABLE" -eq 1 ]; then
+    ensure_bbdown || true
 fi
 
 # 8. 配置指导
