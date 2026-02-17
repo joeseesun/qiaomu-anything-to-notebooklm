@@ -25,6 +25,12 @@ homepage: https://github.com/joeseesun/anything-to-notebooklm
 | 等待生成 | `notebooklm artifact wait <task_id>` |
 | 下载文件 | `notebooklm download <type> ./output` |
 
+## 架构说明（编排器 + 可选插件）
+
+- `anything-to-notebooklm` 是主编排器，负责识别来源、转换、上传与生成。
+- `bilibili-subtitle` 是可选插件，仅负责 B 站字幕提取/转录。
+- B 站能力依赖 `bilibili-subtitle`（以及其底层 `BBDown`）；未安装时主流程可继续处理其他来源。
+
 ## 支持的内容源
 
 ### 1. 微信公众号文章
@@ -103,6 +109,20 @@ MCP 服务器已安装在：`~/.claude/skills/anything-to-notebooklm/wexin-read-
 ```bash
 notebooklm login
 notebooklm list  # 验证认证成功
+```
+
+### 3. 可选 B 站插件（bilibili-subtitle）
+
+如果要处理 Bilibili 链接，需额外安装：
+
+```bash
+# Claude Code
+git clone https://github.com/HamsteRider-m/bilibili-subtitle.git ~/.claude/skills/bilibili-subtitle
+cd ~/.claude/skills/bilibili-subtitle && ./install.sh
+
+# Codex/Agents（如使用该目录）
+git clone https://github.com/HamsteRider-m/bilibili-subtitle.git ~/.agents/skills/bilibili-subtitle
+cd ~/.agents/skills/bilibili-subtitle && ./install.sh
 ```
 
 ## 触发方式
