@@ -35,6 +35,20 @@ AI ：✅ 25 页 PPT 已生成 → slides.pdf
 
 **原理**：自动从多种来源获取内容 → 上传到 [Google NotebookLM](https://notebooklm.google.com/) → AI 生成你想要的格式
 
+## 🧩 架构模式（编排器 + 可选插件）
+
+本项目采用「主 Skill 编排 + 子 Skill 插件」模式：
+
+- `anything-to-notebooklm`：主编排器，负责识别内容源、调用转换工具、上传 NotebookLM、触发生成。
+- `bilibili-subtitle`：可选子插件，专门负责 B 站字幕提取/无字幕转录。
+- `BBDown`：`bilibili-subtitle` 的底层依赖，由安装脚本自动检查/补装。
+
+这意味着：
+
+- 不安装 `bilibili-subtitle` 时，主 Skill 仍可处理微信/网页/YouTube/PDF 等来源。
+- 安装 `bilibili-subtitle` 后，才启用 B 站能力。
+- 两个仓库独立升级，靠命令契约协作，不需要代码仓库硬合并。
+
 ## 🚀 支持的内容源（15+ 种格式）
 
 <table>
@@ -44,6 +58,7 @@ AI ：✅ 25 页 PPT 已生成 → slides.pdf
 ### 📱 社交媒体
 - **微信公众号**（绕过反爬虫）
 - **YouTube 视频**（自动提取字幕）
+- **Bilibili 视频**（可选插件：`bilibili-subtitle`）
 
 ### 🌐 网页
 - **任意网页**（新闻、博客、文档）
@@ -112,6 +127,18 @@ cd anything-to-notebooklm
 ./install.sh
 
 # 3. 按提示配置 MCP，然后重启 Claude Code
+```
+
+### 可选：启用 B 站插件能力
+
+```bash
+# Claude Code
+git clone https://github.com/HamsteRider-m/bilibili-subtitle.git ~/.claude/skills/bilibili-subtitle
+cd ~/.claude/skills/bilibili-subtitle && ./install.sh
+
+# Codex/Agents（如使用该目录）
+git clone https://github.com/HamsteRider-m/bilibili-subtitle.git ~/.agents/skills/bilibili-subtitle
+cd ~/.agents/skills/bilibili-subtitle && ./install.sh
 ```
 
 ### 首次使用
@@ -324,6 +351,19 @@ notebooklm list      # 验证
 ```bash
 ./check_env.py       # 13 项全面检查
 ./install.sh         # 重新安装
+```
+
+### B 站能力不可用
+
+```bash
+# 1) 确认子 Skill 已安装
+ls ~/.agents/skills/bilibili-subtitle
+
+# 2) 重跑安装，确保 BBDown 存在
+cd ~/.agents/skills/bilibili-subtitle && ./install.sh
+
+# 3) 首次使用前登录 BBDown
+BBDown login
 ```
 
 ## 🤝 贡献
