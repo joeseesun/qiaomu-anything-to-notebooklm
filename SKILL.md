@@ -145,7 +145,7 @@ Claude 自动识别输入类型：
 | `https://youtube.com/...` 或 `https://youtu.be/...` | YouTube | 直接传递给 NotebookLM |
 | `https://` 或 `http://` | 网页 | 直接传递给 NotebookLM |
 | `/path/to/file.pdf` | PDF 文件 | markitdown 转 Markdown → TXT |
-| `/path/to/file.epub` | EPUB 电子书 | markitdown 转 Markdown → TXT |
+| `/path/to/file.epub` | EPUB 电子书 | **Python ebooklib** 提取文本 → TXT（避免 Calibre） |
 | `/path/to/file.docx` | Word 文档 | markitdown 转 Markdown → TXT |
 | `/path/to/file.pptx` | PowerPoint | markitdown 转 Markdown → TXT |
 | `/path/to/file.xlsx` | Excel | markitdown 转 Markdown → TXT |
@@ -167,7 +167,8 @@ Claude 自动识别输入类型：
 - NotebookLM 自动提取内容
 
 **Office 文档/电子书/PDF**：
-- 使用 markitdown 转换为 Markdown
+- **EPUB**：使用 Python ebooklib + BeautifulSoup 直接提取文本（避免 Calibre 架构问题）
+- **其他格式**：使用 markitdown 转换为 Markdown
 - 命令：`markitdown /path/to/file.docx -o /tmp/converted.md`
 - 保存为 TXT：`/tmp/{filename}_converted_{timestamp}.txt`
 
