@@ -1,6 +1,6 @@
 ---
 name: qiaomu-anything-to-notebooklm
-description: 多源内容智能处理器：支持微信公众号、网页、YouTube、PDF、Markdown等，自动上传到NotebookLM并生成播客/PPT/思维导图等多种格式
+description: 多源内容智能处理器：支持微信公众号、网页、YouTube、播客（小宇宙/喜马拉雅）、PDF、Markdown等，自动上传到NotebookLM并生成播客/PPT/思维导图等多种格式。支持深度分析模式和飞书文档自动创建
 user-invocable: true
 homepage: https://github.com/joeseesun/qiaomu-anything-to-notebooklm
 ---
@@ -17,13 +17,28 @@ homepage: https://github.com/joeseesun/qiaomu-anything-to-notebooklm
 ### 2. 任意网页链接
 支持任何公开可访问的网页（新闻、博客、文档等）
 
-### 3. YouTube 视频
+### 3. 播客（小宇宙/喜马拉雅）+ B站视频
+通过 Get笔记 API 获取完整转写文本（带时间戳），支持小宇宙、喜马拉雅、B站视频等音频/视频平台
+
+### 4. X/Twitter 帖子
+通过内置代理级联（r.jina.ai → defuddle.md → agent-fetch）抓取推文内容（含长推文线程），转为 Markdown
+
+### 5. 付费墙网站自动绕过
+自动检测并绕过 NYT、WSJ、FT、Economist、Bloomberg、Medium 等 300+ 付费网站的付费墙。策略：UA 伪装（Googlebot/Bingbot）→ Referer 伪装（Google/Facebook）→ AMP 页面 → archive.today 存档
+
+### 5. YouTube 视频
 自动提取 YouTube 视频的字幕和元数据
 
 ### 4. Office 文档
 - **Word (DOCX)** - 保留表格和格式
 - **PowerPoint (PPTX)** - 提取幻灯片和备注
 - **Excel (XLSX)** - 表格数据
+
+### 5. 播客/音频平台
+- **小宇宙** (xiaoyuzhoufm.com) - 通过 Get笔记 API 获取完整转写
+- **喜马拉雅** (ximalaya.com) - 通过 Get笔记 API 获取完整转写
+- **B站视频** (bilibili.com) - 通过 Get笔记 API 获取完整转写
+- 其他音频链接 - 通过 Get笔记 API 获取转写
 
 ### 5. 电子书与文档
 - **PDF** - 全文提取
@@ -98,6 +113,18 @@ notebooklm list  # 验证认证成功
 - "这篇文章帮我做成PPT [URL]"
 - "帮我分析这个网页 [URL]"
 
+### 播客（小宇宙/喜马拉雅/B站）
+- "把这个播客生成播客 [小宇宙链接]"
+- "这个小宇宙节目帮我做成PPT [链接]"
+- "深度解读这期播客 [喜马拉雅链接]"
+- "把这个B站视频转写传到NotebookLM [bilibili链接]"
+- "B站视频帮我生成思维导图 [bilibili链接]"
+
+### X/Twitter 帖子
+- "把这条推文传到NotebookLM [x.com链接]"
+- "这篇推文线程帮我生成报告 [x.com链接]"
+- "深度分析这条推文 [twitter.com链接]"
+
 ### YouTube 视频
 - "把这个YouTube视频做成播客 [YouTube URL]"
 - "这个视频帮我生成思维导图 [YouTube URL]"
@@ -117,6 +144,17 @@ notebooklm list  # 验证认证成功
 ### 混合使用
 - "把这篇文章、这个视频和这个PDF一起上传，生成一份报告"
 
+### 深度分析模式（递归提问）
+- "深度分析这本书 /path/to/book.epub"
+- "提炼这篇文章的核心观点 [URL]"
+- "递归提问分析这个PDF /path/to/file.pdf"
+- "帮我深度解读这个视频 [YouTube URL]"
+
+### 深度分析 + 飞书文档
+- "深度分析这本书并写入飞书 /path/to/book.epub"
+- "分析这篇文章后创建飞书文档 [URL]"
+- "递归提问并生成飞书文档 /path/to/file.pdf"
+
 ## 自然语言 → NotebookLM 功能映射
 
 | 用户说的话 | 识别意图 | NotebookLM 命令 |
@@ -130,6 +168,8 @@ notebooklm list  # 验证认证成功
 | "做个信息图" / "可视化" | infographic | `generate infographic` |
 | "生成数据表" / "做个表格" | data-table | `generate data-table` |
 | "做成闪卡" / "生成记忆卡片" | flashcards | `generate flashcards` |
+| "深度分析" / "提炼核心观点" / "递归提问" / "深度解读" | deep-analysis | 自动生成10个问题并递归提问 |
+| "写入飞书" / "创建飞书文档" / "生成飞书文档" / "保存到飞书" | feishu | 创建飞书文档并写入内容 |
 
 **如果没有明确指令**，默认只上传不生成任何内容，等待用户后续指令。
 
@@ -143,6 +183,9 @@ Claude 自动识别输入类型：
 |---------|-------|---------|
 | `https://mp.weixin.qq.com/s/` | 微信公众号 | MCP 工具抓取 |
 | `https://youtube.com/...` 或 `https://youtu.be/...` | YouTube | 直接传递给 NotebookLM |
+| `xiaoyuzhoufm.com` 或 `ximalaya.com` 或 `bilibili.com` | 播客/视频 | Get笔记 API 转写 → TXT |
+| `x.com` 或 `twitter.com` | X/Twitter 帖子 | 内置代理级联抓取 → TXT |
+| `https://` 或 `http://`（付费网站） | 付费墙网页 | 内置付费墙绕过（UA伪装+archive.today）→ TXT |
 | `https://` 或 `http://` | 网页 | 直接传递给 NotebookLM |
 | `/path/to/file.pdf` | PDF 文件 | markitdown 转 Markdown → TXT |
 | `/path/to/file.epub` | EPUB 电子书 | **Python ebooklib** 提取文本 → TXT（避免 Calibre） |
@@ -162,9 +205,29 @@ Claude 自动识别输入类型：
 - 返回：title, author, publish_time, content
 - 保存为 TXT：`/tmp/weixin_{title}_{timestamp}.txt`
 
+**播客/视频（小宇宙/喜马拉雅/B站）**：
+- 通过 Get笔记 API 获取完整转写文本
+- 调用 `python3 ~/.claude/skills/qiaomu-anything-to-notebooklm/scripts/get_podcast_transcript.py <URL>`
+- 脚本自动执行：创建链接笔记 → 等待转写 → 获取全文 → 保存 TXT
+- 返回 TXT 路径和标题
+- 依赖：Get笔记 API Key（环境变量 `GETNOTE_API_KEY`、`GETNOTE_CLIENT_ID`）+ Web Token（`~/.claude/skills/getnote/tokens.json`）
+
+**X/Twitter 帖子**：
+- 通过内置代理级联抓取推文内容（r.jina.ai → defuddle.md → agent-fetch）
+- 调用 `bash ~/.claude/skills/qiaomu-anything-to-notebooklm/scripts/fetch_url.sh "https://x.com/..."` 获取 Markdown 内容
+- 自动处理 X 登录墙和错误页面
+- 保存为 TXT 后上传到 NotebookLM
+
 **网页/YouTube**：
 - 直接使用 URL 调用 `notebooklm source add [URL]`
 - NotebookLM 自动提取内容
+- **付费墙绕过**：遇到付费网站时，`fetch_url.sh` 自动启用多重绕过策略：
+  1. **r.jina.ai** — 通常能绕过软付费墙
+  2. **Googlebot/Bingbot UA 伪装** — 模拟搜索引擎爬虫（网站为了 SEO 通常给爬虫全文）
+  3. **Referer 伪装** — 伪装来自 Google/Facebook（社交引流豁免）
+  4. **AMP 页面** — AMP 版本通常没有付费墙
+  5. **archive.today** — 从网页存档获取全文
+  - 支持的付费网站：NYT、WSJ、FT、Economist、Bloomberg、Washington Post、New Yorker、Wired、The Atlantic、Medium、MIT Technology Review、SCMP 等 300+ 站点
 
 **Office 文档/电子书/PDF**：
 - **EPUB**：使用 Python ebooklib + BeautifulSoup 直接提取文本（避免 Calibre 架构问题）
@@ -202,10 +265,49 @@ Claude 自动识别输入类型：
 
 ```bash
 notebooklm create "{title}"  # 创建新笔记本
-notebooklm source add /tmp/weixin_xxx.txt --wait  # 上传文件并等待处理完成
+notebooklm source add /tmp/weixin_xxx.txt --title "{title}"  # 上传文件
 ```
 
-**等待处理完成很重要**，否则后续生成会失败。
+**注意**：NotebookLM 会自动处理上传的文件，无需手动等待。
+
+### Step 4: 深度分析模式（可选）
+
+如果用户指定了"深度分析"、"递归提问"等意图，自动执行：
+
+```bash
+# 仅深度分析
+python ~/.claude/skills/qiaomu-anything-to-notebooklm/main.py \
+  /path/to/file.epub --deep-analysis
+
+# 深度分析 + 自动创建飞书文档
+python ~/.claude/skills/qiaomu-anything-to-notebooklm/main.py \
+  /path/to/file.epub --deep-analysis --to-feishu
+```
+
+**深度分析流程**：
+1. 上传内容到 NotebookLM
+2. 根据内容类型自动生成 10 个深度问题
+3. 依次向 NotebookLM 提问并收集答案
+4. 返回结构化 JSON 数据（包含问题、答案、统计信息）
+5. （可选）如果指定 `--to-feishu`，自动创建飞书文档并写入问答内容
+
+**问题类型**：
+- 书籍/文档：核心观点、金句、论证逻辑、实践建议、局限性等
+- 视频：目标受众、关键数据、叙事结构、精华版内容等
+- 文章/网页：写作目的、数据支撑、作者立场、个人启发等
+
+**输出格式**：
+```json
+{
+  "status": "success",
+  "title": "书名/标题",
+  "content_type": "epub/document/url",
+  "questions": ["问题1", "问题2", ...],
+  "answers": ["答案1", "答案2", ...],
+  "total_questions": 10,
+  "answered": 10
+}
+```
 
 ### Step 5: 根据意图生成内容（可选）
 
