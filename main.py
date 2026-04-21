@@ -195,49 +195,83 @@ def create_feishu_doc(title, markdown_content):
 
     return True
 
-def deep_analysis(file_path, title, content_type, to_feishu=False):
-    """深度分析模式：生成问题并递归提问"""
+def deep_analysis(file_path, title, content_type, to_feishu=False, provider="notebooklm", model=None):
+    """深度分析模式：生成问题并递归提问
+
+    Args:
+        file_path:    本地内容文件路径
+        title:        内容标题
+        content_type: 内容类型（epub / document / url 等）
+        to_feishu:    是否写入飞书文档
+        provider:     AI 分析提供方，"notebooklm"（默认）或 "minimax"
+        model:        使用 minimax provider 时的模型名，默认 MiniMax-M2.7
+    """
     print("\n" + "="*60)
     print("🔍 启动深度分析模式")
+    if provider == "minimax":
+        used_model = model or "MiniMax-M2.7"
+        print(f"   Provider: MiniMax ({used_model})")
+    else:
+        print("   Provider: NotebookLM")
     print("="*60 + "\n")
 
-    # 1. 上传到 NotebookLM
-    print("📤 Step 1/3: 上传内容到 NotebookLM...")
-    if not upload_to_notebooklm(file_path, title):
-        return None
-
-    # 等待 NotebookLM 处理完成
-    print("⏳ 等待 NotebookLM 处理内容...")
-    time.sleep(3)
-
     # 2. 生成问题
-    print("\n📝 Step 2/3: 生成深度分析问题...")
+    print("\n📝 Step 1/2: 生成深度分析问题...")
     questions = generate_questions(content_type, title)
     print(f"✅ 已生成 {len(questions)} 个问题\n")
 
     # 3. 递归提问
-    print("💬 Step 3/3: 开始递归提问...\n")
+    print("💬 Step 2/2: 开始递归提问...\n")
     answers = []
 
-    for i, question in enumerate(questions, 1):
-        print(f"[{i}/{len(questions)}] {question}")
-        answer = ask_notebooklm(question)
+    if provider == "minimax":
+        # 读取内容文件，直接传给 MiniMax API
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
+                content = fh.read()
+        except OSError as exc:
+            print(f"❌ 读取文件失败: {exc}", file=sys.stderr)
+            return None
 
-        if answer:
-            print(f"✅ 已回答\n")
-            answers.append(answer)
-        else:
-            print(f"⚠️ 跳过\n")
-            answers.append("")
+        from minimax_provider import analyze_content
+        try:
+            answers = analyze_content(
+                content,
+                questions,
+                model=used_model,
+            )
+            print(f"✅ MiniMax 已回答 {len(answers)} 个问题\n")
+        except Exception as exc:
+            print(f"❌ MiniMax 分析失败: {exc}", file=sys.stderr)
+            return None
+    else:
+        # 默认 NotebookLM 流程
+        print("📤 上传内容到 NotebookLM...")
+        if not upload_to_notebooklm(file_path, title):
+            return None
 
-        # 避免请求过快
-        time.sleep(1)
+        print("⏳ 等待 NotebookLM 处理内容...")
+        time.sleep(3)
+
+        for i, question in enumerate(questions, 1):
+            print(f"[{i}/{len(questions)}] {question}")
+            answer = ask_notebooklm(question)
+
+            if answer:
+                print(f"✅ 已回答\n")
+                answers.append(answer)
+            else:
+                print(f"⚠️ 跳过\n")
+                answers.append("")
+
+            time.sleep(1)
 
     # 4. 返回结构化数据
     result = {
         "status": "success",
         "title": title,
         "content_type": content_type,
+        "provider": provider,
         "questions": questions,
         "answers": answers,
         "total_questions": len(questions),
@@ -253,12 +287,26 @@ def deep_analysis(file_path, title, content_type, to_feishu=False):
 
 def main():
     if len(sys.argv) < 2:
-        print("用法: main.py <输入路径或URL> [--deep-analysis] [--to-feishu]", file=sys.stderr)
+        print("用法: main.py <输入路径或URL> [--deep-analysis] [--to-feishu] [--provider notebooklm|minimax] [--model MiniMax-M2.7]", file=sys.stderr)
         sys.exit(1)
 
     input_arg = sys.argv[1]
     deep_mode = '--deep-analysis' in sys.argv
     to_feishu = '--to-feishu' in sys.argv
+
+    # --provider notebooklm (default) | minimax
+    provider = "notebooklm"
+    if '--provider' in sys.argv:
+        idx = sys.argv.index('--provider')
+        if idx + 1 < len(sys.argv):
+            provider = sys.argv[idx + 1]
+
+    # --model <model-id>  (only used with --provider minimax)
+    llm_model = None
+    if '--model' in sys.argv:
+        idx = sys.argv.index('--model')
+        if idx + 1 < len(sys.argv):
+            llm_model = sys.argv[idx + 1]
 
     input_type = detect_input_type(input_arg)
     print(f"📋 检测到输入类型: {input_type}")
@@ -275,7 +323,7 @@ def main():
         title = epub_path.stem
 
         if deep_mode:
-            result = deep_analysis(txt_path, title, input_type)
+            result = deep_analysis(txt_path, title, input_type, to_feishu=to_feishu, provider=provider, model=llm_model)
             if result:
                 # 保存结果到文件
                 output_file = f"/tmp/{title}_analysis.json"
@@ -292,7 +340,7 @@ def main():
         title = doc_path.stem
 
         if deep_mode:
-            result = deep_analysis(str(doc_path), title, input_type)
+            result = deep_analysis(str(doc_path), title, input_type, to_feishu=to_feishu, provider=provider, model=llm_model)
             if result:
                 output_file = f"/tmp/{title}_analysis.json"
                 with open(output_file, 'w', encoding='utf-8') as f:
@@ -329,7 +377,7 @@ def main():
         print(f"   TXT: {txt_path}")
 
         if deep_mode:
-            result_data = deep_analysis(txt_path, title, 'podcast')
+            result_data = deep_analysis(txt_path, title, 'podcast', to_feishu=to_feishu, provider=provider, model=llm_model)
             if result_data:
                 safe_title = re.sub(r'[：:/\\?|<>*"\']', '_', title).strip('_')[:60]
                 output_file = f"/tmp/{safe_title}_analysis.json"
@@ -378,7 +426,7 @@ def main():
         print(f"   TXT: {txt_path}")
 
         if deep_mode:
-            result_data = deep_analysis(txt_path, safe_title, 'x_twitter')
+            result_data = deep_analysis(txt_path, safe_title, 'x_twitter', to_feishu=to_feishu, provider=provider, model=llm_model)
             if result_data:
                 output_file = f"/tmp/{safe_title}_analysis.json"
                 with open(output_file, 'w', encoding='utf-8') as f:

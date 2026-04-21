@@ -7,5 +7,8 @@ lxml>=4.9.0
 # File format conversion
 markitdown[all]>=0.0.1
 
+# LLM providers (MiniMax and other OpenAI-compatible APIs)
+openai>=1.0.0
+
 # NotebookLM (will be installed from PyPI if available, or from git)
 # notebooklm-py
