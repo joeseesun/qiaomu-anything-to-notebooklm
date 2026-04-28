@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-qiaomu-anything-to-notebooklm - 多源内容智能处理器
+"""qiaomu-anything-to-notebooklm - 多源内容智能处理器
 自动识别输入类型，上传到 NotebookLM 并生成指定格式
-支持深度分析模式：自动生成10个问题并递归提问
+支持深度分析模式：三轮递进提问（概览→深度挖掘→综合反刍）
 """
 
 import sys
@@ -96,62 +95,112 @@ def upload_to_notebooklm(file_path, title):
     print(f"✅ 已上传到 NotebookLM: {title}")
     return True
 
-def generate_questions(content_type, title):
-    """根据内容类型生成10个深度问题"""
+def label_for(content_type):
+    """根据内容类型返回合适的中文指代词"""
+    labels = {
+        'epub': '本书',
+        'document': '这份文档',
+        'podcast': '这期播客',
+        'x_twitter': '这条推文',
+        'youtube': '这个视频',
+        'url': '这篇文章',
+        'weixin': '这篇文章',
+        'search': '这份内容',
+    }
+    return labels.get(content_type, '这份内容')
 
-    # 基础问题模板（适用于所有类型）
-    base_questions = [
-        f"请用一句话概括《{title}》的核心主题",
-        f"《{title}》中最重要的3个观点是什么？",
-        f"作者在《{title}》中想要解决什么问题？",
-        f"《{title}》中有哪些令人印象深刻的金句或名言？（列出5-10条）",
-        f"《{title}》的论证逻辑是什么？作者如何展开论述的？",
+
+def generate_questions_progressive(content_type):
+    """
+    生成三轮回合递进的深度问题。
+
+    本函数与具体内容解耦，不使用 {title} 等占位符，
+    统一用 label_for(content_type) 生成的指代词（如"本书""这个视频"）。
+
+    设计原则：
+    - 第一轮（4题）：建立整体认知框架
+    - 第二轮（5题）：深入挖掘细节与矛盾
+    - 第三轮（3题）：综合反刍与认知升级
+    - NotebookLM 在同一 conversation 中保持上下文，后续回合受益于前序回答
+
+    问题设计技巧：
+    - "请基于提供的文档内容回答" 防止 NotebookLM 触发网络搜索
+    - "列出、拆解、指出、提取" 等动作词引导结构化回答
+    - 避免 yes/no 式问题
+    """
+    name = label_for(content_type)
+
+    # ── 第一轮：概览与框架 ──
+    round1 = [
+        f"请用一段话概括{name}的核心主题和写作目的。注意：完全基于已上传的文档内容回答，不要搜索网络。",
+        f"{name}的整体结构是什么？请按章节或逻辑模块逐一列出，每个模块用2-3句话概括核心内容。完全基于文档回答。",
+        f"{name}提出了哪些核心论点或主张？请逐一列出并用文档中的具体内容支撑每个论点。完全基于文档回答。",
+        f"{name}中最具颠覆性或反常识的内容是什么？请列出3-5条，并解释每条为什么让人意外。完全基于文档回答。",
     ]
 
-    # 根据内容类型添加特定问题
+    # ── 第二轮：深度挖掘 ──
     if content_type in ['epub', 'document']:
-        # 书籍/文档类
-        specific_questions = [
-            f"《{title}》适合什么样的读者？为什么？",
-            f"《{title}》中有哪些实践建议或行动指南？",
-            f"《{title}》的局限性是什么？有哪些观点值得商榷？",
-            f"如果要向朋友推荐《{title}》，你会怎么说？（50字以内）",
-            f"读完《{title}》后，最大的收获是什么？",
+        # 书籍/文档类：侧重论证逻辑与文本细读
+        round2 = [
+            f"请拆解{name}的核心论证逻辑：作者的前提假设是什么？推理过程是怎样的？最终结论是什么？请引用具体文本段落说明。",
+            f"{name}中引用了哪些关键案例、数据或文本证据？请逐一列出并说明每个证据在整体论证中起到什么作用。",
+            f"{name}中是否存在内部矛盾或值得商榷的观点？如果有，请指出并分析矛盾的根源。如果没有，请说明为什么论证站得住脚。",
+            f"{name}最独特的贡献或核心洞察是什么？如果只能用一句话概括，应该是什么？为什么这句话重要？",
+            f"如果要对{name}提出一个最尖锐的批评，会是什么？请从论证完整性、证据充分性、视角局限性等角度分析。",
         ]
     elif content_type == 'youtube':
-        # 视频类
-        specific_questions = [
-            f"这个视频的目标受众是谁？",
-            f"视频中提到了哪些关键数据或案例？",
-            f"视频的叙事结构是什么？",
-            f"如果要做一个5分钟的精华版，应该保留哪些内容？",
-            f"这个视频的观点在当前环境下是否仍然适用？",
+        round2 = [
+            f"这个视频的核心论点是什么？演讲者用哪些论据来支撑？请拆解其论证结构。",
+            f"视频中提到了哪些具体案例、数据或研究？请逐一列出并说明它们在论证中的作用。",
+            f"这个视频的立场是否存在偏向或漏洞？哪些观点可能经不起推敲？",
+            f"这个视频最独特的信息或洞察是什么？有没有在其他地方看不到的内容？",
+            f"如果请一位持反对立场的专家来回应，他最可能提出的三个反驳点是什么？",
         ]
     else:
-        # 文章/网页类
-        specific_questions = [
-            f"这篇内容的写作目的是什么？",
-            f"内容中有哪些数据或事实支撑？",
-            f"作者的立场和观点是什么？",
-            f"这篇内容对我有什么启发？",
-            f"如果要转发这篇内容，我会加什么评论？",
+        # 文章/网页/播客/推文类：侧重叙事与观点分析
+        round2 = [
+            f"请拆解{name}的论证或叙事结构：开头如何建立框架？中间如何展开？结尾如何收束？使用了哪些修辞或论证手法？",
+            f"{name}中引用了哪些关键案例、数据或引用？请逐一列出并评估其可信度和相关性。",
+            f"{name}的立场或视角是否存在局限？有没有重要的反例或未被讨论的维度？",
+            f"{name}最令人印象深刻的一个洞察或观点是什么？为什么它具有冲击力？",
+            f"如果要给{name}的作者写一封简短的反馈信，你会提出哪三个建设性意见或质疑？",
         ]
 
-    return base_questions + specific_questions
+    # ── 第三轮：综合与反刍 ──
+    round3 = [
+        f"读完{name}后，读者最应该带走的一个认知改变是什么？哪些观点可能颠覆读者的既有认知？",
+        f"从{name}中可以提取出哪些可操作的行动指南、实践建议或决策原则？请列出3-5条。",
+        f"请用三个最有力的理由，说服一个没接触过{name}的人去认真阅读它。每个理由用一句话概括。",
+    ]
 
-def ask_notebooklm(question):
-    """向 NotebookLM 提问并获取答案"""
-    result = subprocess.run(
-        ['notebooklm', 'ask', question],
-        capture_output=True,
-        text=True
-    )
+    # 合并所有轮次，每轮之间加一个分隔标识（便于后续处理和展示）
+    all_questions = []
+    all_questions.append(("【第一轮：概览与框架】", round1))
+    all_questions.append(("【第二轮：深度挖掘】", round2))
+    all_questions.append(("【第三轮：综合与反刍】", round3))
 
-    if result.returncode != 0:
-        print(f"⚠️ 提问失败: {result.stderr}", file=sys.stderr)
-        return None
+    return all_questions
 
-    return result.stdout.strip()
+def ask_notebooklm(question, max_retries=1):
+    """向 NotebookLM 提问并获取答案，带重试机制"""
+    for attempt in range(max_retries + 1):
+        result = subprocess.run(
+            ['notebooklm', 'ask', question],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            answer = result.stdout.strip()
+            if answer and len(answer) > 10:  # 有实质内容的回答才算成功
+                return answer
+
+        if attempt < max_retries:
+            print(f"  重试中...", end=" ")
+            time.sleep(2)
+
+    print(f"⚠️ 提问失败（已重试{max_retries}次）", file=sys.stderr)
+    return None
 
 def format_feishu_markdown(title, questions, answers):
     """将问答结果格式化为飞书 Markdown"""
@@ -195,58 +244,70 @@ def create_feishu_doc(title, markdown_content):
 
     return True
 
+def ask_round(round_label, questions, title):
+    """执行一轮提问，返回 (questions, answers) 列表"""
+    print(f"\n📌 {round_label}")
+    answers = []
+    asked = []
+    for i, q in enumerate(questions, 1):
+        print(f"  [{i}/{len(questions)}] {q[:60]}...")
+        answer = ask_notebooklm(q)
+        if answer:
+            print(f"  ✅ 回答长度: {len(answer)} 字符")
+            answers.append(answer)
+        else:
+            print(f"  ⚠️ 跳过")
+            answers.append("")
+        asked.append(q)
+        time.sleep(1.5)  # 避免请求过快
+    return asked, answers
+
+
 def deep_analysis(file_path, title, content_type, to_feishu=False):
-    """深度分析模式：生成问题并递归提问"""
+    """深度分析模式：三轮递进提问"""
     print("\n" + "="*60)
     print("🔍 启动深度分析模式")
     print("="*60 + "\n")
 
     # 1. 上传到 NotebookLM
-    print("📤 Step 1/3: 上传内容到 NotebookLM...")
+    print("📤 上传内容到 NotebookLM...")
     if not upload_to_notebooklm(file_path, title):
         return None
 
-    # 等待 NotebookLM 处理完成
     print("⏳ 等待 NotebookLM 处理内容...")
     time.sleep(3)
 
-    # 2. 生成问题
-    print("\n📝 Step 2/3: 生成深度分析问题...")
-    questions = generate_questions(content_type, title)
-    print(f"✅ 已生成 {len(questions)} 个问题\n")
+    # 2. 生成三轮递进问题
+    print("\n📝 生成深度分析问题...")
+    rounds = generate_questions_progressive(content_type)
+    total_questions = sum(len(qs) for _, qs in rounds)
+    print(f"✅ 共 {len(rounds)} 轮 {total_questions} 个问题\n")
 
-    # 3. 递归提问
-    print("💬 Step 3/3: 开始递归提问...\n")
-    answers = []
+    # 3. 逐轮提问（NotebookLM 保持对话上下文，后轮受益于前轮回答）
+    print("💬 开始三轮递进提问...\n")
+    all_questions = []
+    all_answers = []
 
-    for i, question in enumerate(questions, 1):
-        print(f"[{i}/{len(questions)}] {question}")
-        answer = ask_notebooklm(question)
-
-        if answer:
-            print(f"✅ 已回答\n")
-            answers.append(answer)
-        else:
-            print(f"⚠️ 跳过\n")
-            answers.append("")
-
-        # 避免请求过快
-        time.sleep(1)
+    for round_label, questions in rounds:
+        asked, answers = ask_round(round_label, questions, title)
+        all_questions.extend(asked)
+        all_answers.extend(answers)
 
     # 4. 返回结构化数据
     result = {
         "status": "success",
         "title": title,
         "content_type": content_type,
-        "questions": questions,
-        "answers": answers,
-        "total_questions": len(questions),
-        "answered": len([a for a in answers if a])
+        "rounds": len(rounds),
+        "questions": all_questions,
+        "answers": all_answers,
+        "total_questions": len(all_questions),
+        "answered": len([a for a in all_answers if a]),
     }
 
     # 5. 如果指定了 --to-feishu，创建飞书文档
     if to_feishu:
-        markdown = format_feishu_markdown(title, questions, answers)
+        markdown = format_feishu_markdown(title, all_questions, all_answers)
         create_feishu_doc(f"{title} - 深度解读", markdown)
 
     return result
@@ -390,64 +451,54 @@ def main():
     elif input_type == 'url':
         print(f"🌐 处理 URL: {input_arg}")
 
+        # 添加 URL 作为 source
+        result = subprocess.run(
+            ['notebooklm', 'source', 'add', input_arg],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            print(f"❌ 添加失败: {result.stderr}", file=sys.stderr)
+            sys.exit(1)
+
+        print("✅ URL 已添加到 NotebookLM")
+
         if deep_mode:
-            # URL 需要先上传，然后提取标题
-            result = subprocess.run(
-                ['notebooklm', 'source', 'add', input_arg],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                print("✅ URL 已添加到 NotebookLM")
-                # 从 URL 提取标题（简化版）
-                title = input_arg.split('/')[-1] or 'web_content'
+            title = input_arg.split('/')[-1] or 'web_content'
+            print("⏳ 等待 NotebookLM 处理内容...")
+            time.sleep(3)
 
-                # 等待处理
-                time.sleep(3)
+            # 使用通用三轮递进提问
+            rounds = generate_questions_progressive(input_type)
+            total_questions = sum(len(qs) for _, qs in rounds)
+            print(f"\n📝 开始提问（共 {total_questions} 个问题，{len(rounds)} 轮）...")
 
-                # 生成问题并提问
-                questions = generate_questions('url', title)
-                answers = []
+            all_questions = []
+            all_answers = []
+            for round_label, questions in rounds:
+                asked, answers = ask_round(round_label, questions, title)
+                all_questions.extend(asked)
+                all_answers.extend(answers)
 
-                print(f"\n💬 开始提问（共 {len(questions)} 个问题）...\n")
-                for i, question in enumerate(questions, 1):
-                    print(f"[{i}/{len(questions)}] {question}")
-                    answer = ask_notebooklm(question)
-                    if answer:
-                        print(f"✅ 已回答\n")
-                        answers.append(answer)
-                    else:
-                        print(f"⚠️ 跳过\n")
-                        answers.append("")
-                    time.sleep(1)
+            result_data = {
+                "status": "success",
+                "title": title,
+                "url": input_arg,
+                "content_type": input_type,
+                "rounds": len(rounds),
+                "questions": all_questions,
+                "answers": all_answers,
+                "total_questions": len(all_questions),
+                "answered": len([a for a in all_answers if a]),
+            }
 
-                result = {
-                    "status": "success",
-                    "title": title,
-                    "url": input_arg,
-                    "questions": questions,
-                    "answers": answers
-                }
+            if to_feishu:
+                md = format_feishu_markdown(title, all_questions, all_answers)
+                create_feishu_doc(f"{title} - 深度解读", md)
 
-                output_file = f"/tmp/{title}_analysis.json"
-                with open(output_file, 'w', encoding='utf-8') as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                print(f"\n✅ 分析完成！结果已保存到: {output_file}")
-            else:
-                print(f"❌ 添加失败: {result.stderr}", file=sys.stderr)
-                sys.exit(1)
-        else:
-            # 普通模式：只上传
-            result = subprocess.run(
-                ['notebooklm', 'source', 'add', input_arg],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                print("✅ URL 已添加到 NotebookLM")
-            else:
-                print(f"❌ 添加失败: {result.stderr}", file=sys.stderr)
-                sys.exit(1)
+            output_file = f"/tmp/{title}_analysis.json"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(result_data, f, ensure_ascii=False, indent=2)
+            print(f"\n✅ 分析完成！结果已保存到: {output_file}")
 
     else:
         print(f"❌ 不支持的输入类型: {input_type}", file=sys.stderr)

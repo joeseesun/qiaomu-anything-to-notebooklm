@@ -27,7 +27,7 @@ homepage: https://github.com/joeseesun/qiaomu-anything-to-notebooklm
 自动检测并绕过 NYT、WSJ、FT、Economist、Bloomberg、Medium 等 300+ 付费网站的付费墙。策略：UA 伪装（Googlebot/Bingbot）→ Referer 伪装（Google/Facebook）→ AMP 页面 → archive.today 存档
 
 ### 5. YouTube 视频
-自动提取 YouTube 视频的字幕和元数据
+**直接传递给 NotebookLM！** NotebookLM 原生支持 YouTube 链接，会自动提取视频字幕和元数据，无需手动下载字幕或转写。禁止使用 yt-dlp 或浏览器自动化提取字幕。
 
 ### 4. Office 文档
 - **Word (DOCX)** - 保留表格和格式
@@ -126,6 +126,7 @@ notebooklm list  # 验证认证成功
 - "深度分析这条推文 [twitter.com链接]"
 
 ### YouTube 视频
+- **直接传 URL 给 NotebookLM，不下载字幕！** NotebookLM 原生支持 YouTube
 - "把这个YouTube视频做成播客 [YouTube URL]"
 - "这个视频帮我生成思维导图 [YouTube URL]"
 
@@ -218,10 +219,16 @@ Claude 自动识别输入类型：
 - 自动处理 X 登录墙和错误页面
 - 保存为 TXT 后上传到 NotebookLM
 
-**网页/YouTube**：
-- 直接使用 URL 调用 `notebooklm source add [URL]`
+**网页**：
+- 直接使用 `notebooklm source add <URL>`
 - NotebookLM 自动提取内容
-- **付费墙绕过**：遇到付费网站时，`fetch_url.sh` 自动启用多重绕过策略：
+- **付费墙绕过**：遇到付费网站时，`fetch_url.sh` 自动启用多重绕过策略
+
+**YouTube 🔴 特殊规则（最重要！）**：
+- **直接传递 URL 给 NotebookLM！** `notebooklm source add <YouTube_URL>`
+- **禁止**使用 yt-dlp、yt-search-download、whisper、浏览器自动化等手段下载字幕
+- NotebookLM 原生支持 YouTube，会自动提取字幕和元数据
+- 这是最快速、最高效的方式，不需要任何中间步骤
   1. **r.jina.ai** — 通常能绕过软付费墙
   2. **Googlebot/Bingbot UA 伪装** — 模拟搜索引擎爬虫（网站为了 SEO 通常给爬虫全文）
   3. **Referer 伪装** — 伪装来自 Google/Facebook（社交引流豁免）
