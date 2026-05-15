@@ -8,6 +8,10 @@ import os
 import json
 from pathlib import Path
 
+# Windows GBK 编码无法输出 emoji，强制使用 UTF-8
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # 颜色输出
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -61,7 +65,7 @@ def check_command(cmd):
         try:
             result = subprocess.run([cmd, "--version"],
                                   capture_output=True,
-                                  text=True,
+                                  encoding='utf-8',
                                   timeout=5)
             version = result.stdout.split('\n')[0] if result.stdout else "unknown"
             print_status("ok", f"{cmd} 已安装 ({version})")
@@ -113,7 +117,7 @@ def check_notebooklm_auth():
     try:
         result = subprocess.run(["notebooklm", "list"],
                               capture_output=True,
-                              text=True,
+                              encoding='utf-8',
                               timeout=10)
 
         if result.returncode == 0:
