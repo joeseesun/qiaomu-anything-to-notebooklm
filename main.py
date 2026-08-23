@@ -12,17 +12,27 @@ import json
 import time
 import re
 from pathlib import Path
+from urllib.parse import urlparse
+
+X_HOSTS = {
+    'mobile.twitter.com',
+    'twitter.com',
+    'www.twitter.com',
+    'www.x.com',
+    'x.com',
+}
 
 def detect_input_type(input_path):
     """检测输入类型"""
     if input_path.startswith('http'):
+        hostname = (urlparse(input_path).hostname or '').lower().rstrip('.')
         if 'mp.weixin.qq.com' in input_path:
             return 'weixin'
         elif 'youtube.com' in input_path or 'youtu.be' in input_path:
             return 'youtube'
         elif 'xiaoyuzhoufm.com' in input_path or 'ximalaya.com' in input_path or 'bilibili.com' in input_path:
             return 'podcast'
-        elif 'x.com' in input_path or 'twitter.com' in input_path:
+        elif hostname in X_HOSTS:
             return 'x_twitter'
         else:
             return 'url'
@@ -320,6 +330,7 @@ def main():
     input_arg = sys.argv[1]
     deep_mode = '--deep-analysis' in sys.argv
     to_feishu = '--to-feishu' in sys.argv
+    use_xquik = '--xquik' in sys.argv
 
     input_type = detect_input_type(input_arg)
     print(f"📋 检测到输入类型: {input_type}")
@@ -402,16 +413,24 @@ def main():
 
     elif input_type == 'x_twitter':
         print(f"🐦 处理 X/Twitter: {input_arg}")
-        print("   通过代理级联获取推文内容...")
+        if use_xquik:
+            print("   通过 Xquik 获取最多 100 条同作者公开线程内容...")
+            fetch_script = os.path.join(os.path.dirname(__file__), 'scripts', 'fetch_x_post.py')
+            command = [sys.executable, fetch_script, input_arg]
+        else:
+            print("   通过代理级联获取推文内容...")
+            fetch_script = os.path.join(os.path.dirname(__file__), 'scripts', 'fetch_url.sh')
+            command = ['bash', fetch_script, input_arg]
 
-        fetch_script = os.path.join(os.path.dirname(__file__), 'scripts', 'fetch_url.sh')
         result = subprocess.run(
-            ['bash', fetch_script, input_arg],
+            command,
             capture_output=True, text=True, timeout=60
         )
 
         if result.returncode != 0:
             print(f"❌ 获取推文失败: {result.stderr}", file=sys.stderr)
+            if not use_xquik:
+                print("提示: 配置 XQUIK_API_KEY，经确认后使用 --xquik 重试。", file=sys.stderr)
             sys.exit(1)
 
         content = result.stdout.strip()
