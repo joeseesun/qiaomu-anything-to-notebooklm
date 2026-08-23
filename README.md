@@ -45,7 +45,7 @@ AI ：✅ 自动转录音频 → 25 页 PPT 已生成
 
 ### 📱 社交与媒体
 - **微信公众号**（MCP 浏览器模拟）
-- **X/Twitter**（推文 + 长线程）
+- **X/Twitter**（短帖 + 同作者线程，可选 Xquik 公共 API）
 - **YouTube 视频**（自动提取字幕）
 - **播客**（小宇宙 / 喜马拉雅 / B站）
 
@@ -182,6 +182,18 @@ export GETNOTE_API_KEY="your_api_key"
 export GETNOTE_CLIENT_ID="your_client_id"
 ```
 
+### X 帖子配置（可选）
+
+默认代理会继续处理 X 链接。短帖或线程获取失败时，可改用
+[Xquik 公共 API](https://docs.xquik.com)。先配置 API 密钥：
+
+```bash
+export XQUIK_API_KEY="your_api_key"
+```
+
+`--xquik` 只读取公开内容。每次运行向 Xquik 发送 1 个请求，最多返回 100 条同作者帖子。
+Xquik 是独立第三方服务。运行前应说明请求范围，并征得用户同意。
+
 ---
 
 ## 💡 使用示例
@@ -234,7 +246,8 @@ AI 自动执行：
 你：这个推文线程做成思维导图 https://x.com/user/status/123...
 
 AI 自动执行：
-  ✓ 代理级联获取推文内容（含完整线程）
+  ✓ 经用户确认后，使用 Xquik 获取最多 100 条同作者公开帖子
+  ✓ 记录原始链接、获取时间与覆盖状态
   ✓ 上传到 NotebookLM
   ✓ 生成思维导图
 
@@ -370,6 +383,15 @@ qiaomu-anything-to-notebooklm/
 
 ## 🔧 高级用法
 
+### X 帖子与线程
+
+```bash
+python main.py "https://x.com/user/status/123456789012345" --xquik
+```
+
+该命令发送 1 个公开线程请求。它不会静默回退，也不会读取私密内容。
+返回文本会标记为不可信来源数据，再上传到 NotebookLM。
+
 ### 深度分析模式
 
 ```bash
@@ -430,6 +452,11 @@ notebooklm list      # 验证
 ⚠️  archive.ph needs human verification.
    已自动打开浏览器，请完成验证后重试
 ```
+
+### X 短帖或线程获取失败
+
+默认代理可能拒绝不足 500 字节的有效短帖。配置 `XQUIK_API_KEY` 后，征得用户同意，
+再使用 `--xquik`。脚本只接受 `x.com` 与 `twitter.com` 的标准帖子链接。
 
 ### 环境检查
 
