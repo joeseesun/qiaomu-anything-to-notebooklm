@@ -68,6 +68,8 @@ homepage: https://github.com/joeseesun/qiaomu-anything-to-notebooklm
 
 ## 前置条件
 
+**Windows（PowerShell/CMD）**：先在仓库运行 `.\install.cmd`（Python 3.10+、Git），按输出手动配置 MCP。使用 `.\run.cmd notebooklm <参数>`、`.\run.cmd check-env` 和 `.\run.cmd "C:\path\to\file.pdf" --deep-analysis`，保证 CLI 与脚本使用同一个本地虚拟环境。Windows 临时输出位于 `%TEMP%`；下文 `/tmp` 示例面向 macOS/Linux。Bash 抓取链路（X/Twitter）使用 WSL。认证由用户自行执行，完整步骤见 README 的 Windows 章节。
+
 ### 1. 安装 wexin-read-mcp
 
 MCP 服务器已安装在：`~/.claude/skills/qiaomu-anything-to-notebooklm/wexin-read-mcp/`

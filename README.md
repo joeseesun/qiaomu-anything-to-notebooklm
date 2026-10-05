@@ -162,6 +162,36 @@ cd qiaomu-anything-to-notebooklm
 # 3. 按提示配置 MCP，然后重启 Claude Code
 ```
 
+### Windows：PowerShell / CMD
+
+安装 Python **3.10+** 和 Git for Windows，然后在仓库目录的终端中运行：
+
+```powershell
+.\install.cmd
+```
+
+安装器依次检测 `py -3`、`python`、`python3`，检查真实 Python 版本（避开不可用的 Windows Store 别名）。依赖与 Chromium 下载到仓库内的 `.venv`，无需修改全局 Python 或 PATH。安装期间不登录、不读取凭据、不上传内容；失败会保留错误和非零退出码，请在终端中运行以便查看日志。
+
+按安装器打印的 JSON **手动**配置 MCP：使用 `.venv\Scripts\python.exe` 的绝对路径和 `PLAYWRIGHT_BROWSERS_PATH`，JSON 已正确转义 Windows 路径。随后重启 Claude Code。
+
+```powershell
+# 以下认证命令由用户在准备好时自行运行
+.\run.cmd notebooklm login
+.\run.cmd notebooklm list
+.\run.cmd check-env
+
+# 路径包含空格时加引号，使用安装时的同一环境
+.\run.cmd "C:\Users\me\Documents\notes.pdf"
+.\run.cmd "C:\Users\me\Documents\book.epub" --deep-analysis
+.\run.cmd --help
+```
+
+CMD 使用相同命令（也可以省略 `.\`）。`run.cmd notebooklm <参数>` 可调用本地 NotebookLM CLI，无需激活虚拟环境。深度分析 JSON 保存到系统临时目录（Windows 的 `%TEMP%`）。仅 Windows 入口使用这个本地环境；macOS/Linux 原有安装方式不变。
+
+`main.py` 的文件/普通网页/播客入口可使用上述运行方式；播客仍需用户自行配置 Get笔记，EPUB 需要 `ebooklib`（安装器会安装）。X/Twitter 的 Bash 抓取链路需在 WSL 中使用。Office/OCR/音频等转换仍按 Skill 的现有 `markitdown` 工作流执行，不属于 `main.py` 已实现的自动分支。
+
+编码兼容基于 [rice5 的社区 PR #5](https://github.com/joeseesun/qiaomu-anything-to-notebooklm/pull/5)，并扩展到 stderr 和运行入口。离线测试：`python -m unittest discover -s tests -v`；Windows CI 覆盖 CMD/PowerShell、中文及空格路径、失败退出码，不使用真实账户。依赖下载与真实 NotebookLM 认证需在用户环境中另外验证。
+
 ### 首次使用
 
 ```bash

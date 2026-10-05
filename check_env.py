@@ -8,9 +8,9 @@ import os
 import json
 from pathlib import Path
 
-# Windows GBK 编码无法输出 emoji，强制使用 UTF-8
-if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8')
+from runtime_compat import configure_console
+
+configure_console()
 
 # 颜色输出
 RED = '\033[0;31m'
@@ -65,7 +65,7 @@ def check_command(cmd):
         try:
             result = subprocess.run([cmd, "--version"],
                                   capture_output=True,
-                                  encoding='utf-8',
+                                  encoding='utf-8', errors='replace',
                                   timeout=5)
             version = result.stdout.split('\n')[0] if result.stdout else "unknown"
             print_status("ok", f"{cmd} 已安装 ({version})")
@@ -85,7 +85,7 @@ def check_mcp_config():
         return False
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
         if "mcpServers" in config and "weixin-reader" in config["mcpServers"]:
@@ -117,7 +117,7 @@ def check_notebooklm_auth():
     try:
         result = subprocess.run(["notebooklm", "list"],
                               capture_output=True,
-                              encoding='utf-8',
+                              encoding='utf-8', errors='replace',
                               timeout=10)
 
         if result.returncode == 0:
@@ -211,7 +211,7 @@ def main():
 
     if passed < total:
         print("💡 修复建议：")
-        print("  1. 运行安装脚本：./install.sh")
+        print("  1. 运行安装脚本：" + ("install.cmd" if os.name == "nt" else "./install.sh"))
         print("  2. 配置 MCP：编辑 ~/.claude/config.json")
         print("  3. 认证 NotebookLM：notebooklm login")
         print()
