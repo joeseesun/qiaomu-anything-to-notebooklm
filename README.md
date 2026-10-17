@@ -182,6 +182,47 @@ export GETNOTE_API_KEY="your_api_key"
 export GETNOTE_CLIENT_ID="your_client_id"
 ```
 
+### 主题资料搜索：Parallel Search MCP（可选）
+
+只有研究主题、还没有具体链接时，可以在 Claude Code 中用 [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) 搜索公开资料、读取候选网页，再把选中的来源交给本 Skill。匿名搜索使用 Fast 模式，无需 Parallel 账号或 API Key；免费访问有频率限制，适合轻量研究。
+
+本流程用于个人学习研究，仍需完成上面的 NotebookLM 安装和登录。它通过 Claude Code 的 MCP 工具运行，不是 `main.py` 的命令行参数。未明确选择 Parallel 时，关键词搜索仍使用原有 WebSearch 流程。
+
+**1. 在终端添加可选 MCP 服务器**：
+
+```bash
+claude mcp add --transport http --scope user parallel-search https://search.parallel.ai/mcp --header "User-Agent: qiaomu-anything-to-notebooklm"
+claude mcp get parallel-search
+```
+
+`--scope user` 让该服务器在你的所有 Claude Code 项目中可用。如果只想在当前项目使用，把添加和移除命令中的 `user` 都改成 `local`。如果已有名为 `parallel-search` 的配置，先检查并保留现有设置，不要覆盖。更多选项见 [Claude Code MCP 配置说明](https://code.claude.com/docs/en/mcp)。
+
+重新启动 Claude Code，在会话中运行 `/mcp`，确认 `parallel-search` 已连接，并按提示授权所需工具。该服务器提供 `web_search` 和 `web_fetch`。
+
+**2. 先查找并筛选来源**：
+
+```text
+使用 parallel-search 的 web_search 搜索“检索增强生成的评估方法”，
+优先找原始论文和官方文档。列出 3-5 个候选来源的标题、URL、发布日期
+和相关性说明；找不到日期就标为未知。先不要上传或生成内容，等我选择。
+```
+
+**3. 把选中的来源交给 NotebookLM**：
+
+```text
+用 parallel-search 的 web_fetch 核对我选中的第 1、3 个网页，
+然后用 qiaomu-anything-to-notebooklm 把这两个原始 URL 加到新的“RAG 评估”笔记本。
+只添加来源，暂不生成报告。
+```
+
+搜索摘要和抓取片段不等于完整网页；以 NotebookLM 成功导入的正文为准。无法读取的来源应明确说明，不要把片段当成全文。如果服务不可用或触发频率限制，可稍后重试，或由你选择原有 WebSearch 流程。这个可选服务不替代现有的微信、播客、本地文件等专用处理方式。
+
+**移除可选配置**：
+
+```bash
+claude mcp remove --scope user parallel-search
+```
+
 ---
 
 ## 💡 使用示例
