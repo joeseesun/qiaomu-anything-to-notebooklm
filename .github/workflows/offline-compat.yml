@@ -14,6 +14,9 @@ jobs:
         python: ['3.10', '3.13']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      PY_PYTHON3: ${{ matrix.python }}
+      SMOKE_EXPECT_PYTHON: ${{ matrix.python }}
     defaults:
       run:
         working-directory: checkout 中文 space

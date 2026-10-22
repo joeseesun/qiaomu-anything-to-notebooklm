@@ -48,7 +48,8 @@ def main():
         os.environ.update(env)
 
         def run(args, expected=0):
-            result = subprocess.run([str(a) for a in args], env=env, cwd=temp,
+            command = args if isinstance(args, str) else [str(a) for a in args]
+            result = subprocess.run(command, env=env, cwd=temp,
                                     capture_output=True, encoding='utf-8', errors='replace', timeout=60)
             assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
             return result
@@ -60,6 +61,10 @@ def main():
         assert '--use' in run([cli, 'create', '--help']).stdout
         assert '--title' in run([cli, 'source', 'add', '--help']).stdout
         print('PASS pip check and NotebookLM CLI contract:', version('notebooklm-py'))
+        print('Installed Python:', sys.version.split()[0])
+        expected_python = env.get('SMOKE_EXPECT_PYTHON')
+        if expected_python:
+            assert sys.version.startswith(expected_python + '.'), sys.version
 
         from playwright.sync_api import sync_playwright
         with sync_playwright() as playwright:
@@ -102,7 +107,9 @@ def main():
         document = temp / '合成 upload must fail.md'
         document.write_text('Synthetic smoke test. No account or user data.', encoding='utf-8')
         if os.name == 'nt':
-            result = run(['cmd', '/d', '/c', str(ROOT / 'run.cmd'), str(document)], expected=1)
+            # CMD needs an outer pair when both the batch path and argument
+            # are quoted. list2cmdline applies C-runtime quoting, not CMD's.
+            result = run(f'cmd.exe /d /s /c ""{ROOT / "run.cmd"}" "{document}""', expected=1)
         else:
             result = run([sys.executable, ROOT / 'main.py', document], expected=1)
         assert '创建笔记本失败' in result.stderr, result.stderr
