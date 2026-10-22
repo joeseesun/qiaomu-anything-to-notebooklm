@@ -9,6 +9,9 @@ import subprocess
 import sys
 
 MIN_PYTHON = (3, 10)  # notebooklm-py requires Python >=3.10
+# Last Playwright-based upstream revision. Newer revisions require external
+# agent-browser/url-md binaries that this installer does not provision.
+MCP_REVISION = 'e6d3bf594349eb29e4e7031b500dd82a4cb97e49'
 
 
 def install(root):
@@ -23,8 +26,8 @@ def install(root):
     env['PYTHONIOENCODING'] = 'utf-8'
     env['PLAYWRIGHT_BROWSERS_PATH'] = str(venv / 'browsers')
 
-    def run(args):
-        subprocess.run([str(arg) for arg in args], check=True, env=env, cwd=root)
+    def run(args, **kwargs):
+        return subprocess.run([str(arg) for arg in args], check=True, env=env, cwd=root, **kwargs)
 
     if not python.is_file():
         run([sys.executable, '-m', 'venv', venv])
@@ -32,13 +35,21 @@ def install(root):
     run([python, '-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'])
     mcp = root / 'wexin-read-mcp'
     if not mcp.exists():
-        run(['git', 'clone', 'https://github.com/Bwkyd/wexin-read-mcp.git', mcp])
+        run(['git', 'clone', '--no-checkout', 'https://github.com/Bwkyd/wexin-read-mcp.git', mcp])
+        run(['git', '-C', mcp, 'checkout', '--detach', MCP_REVISION])
+    revision = run(['git', '-C', mcp, 'rev-parse', 'HEAD'],
+                   capture_output=True, encoding='utf-8').stdout.strip()
+    if revision != MCP_REVISION:
+        raise RuntimeError(
+            f'Existing MCP checkout uses {revision}, expected {MCP_REVISION}. '
+            'It has been left unchanged. Move wexin-read-mcp to a backup location '
+            'and rerun the installer, or manage its additional dependencies yourself.')
     if not (mcp / 'src/server.py').is_file():
         raise RuntimeError('Incomplete wexin-read-mcp checkout: src/server.py is missing.')
     run([python, '-m', 'pip', 'install', '-r', root / 'requirements.txt'])
     if (mcp / 'requirements.txt').is_file():
         run([python, '-m', 'pip', 'install', '-r', mcp / 'requirements.txt'])
-    run([python, '-m', 'pip', 'install', 'notebooklm-py[browser]'])
+    run([python, '-m', 'pip', 'install', 'notebooklm-py[browser]>=0.8.5,<0.9'])
     run([python, '-m', 'playwright', 'install', 'chromium'])
     scripts = python.parent
     run([scripts / ('notebooklm.exe' if os.name == 'nt' else 'notebooklm'), '--version'])

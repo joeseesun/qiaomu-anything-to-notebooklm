@@ -27,7 +27,7 @@ class InstallerTests(unittest.TestCase):
             (mcp / 'src/server.py').touch()
             (mcp / 'requirements.txt').touch()
             (root / 'requirements.txt').touch()
-            with patch('install.shutil.which', return_value='git'), patch('install.subprocess.run') as run, contextlib.redirect_stdout(io.StringIO()) as output:
+            with patch('install.shutil.which', return_value='git'), patch('install.subprocess.run', return_value=subprocess.CompletedProcess([], 0, install.MCP_REVISION)) as run, contextlib.redirect_stdout(io.StringIO()) as output:
                 install.install(root)
             calls = run.call_args_list
             python = str(root / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python'))
@@ -53,11 +53,27 @@ class InstallerTests(unittest.TestCase):
                 if args[:2] == ['git', 'clone']:
                     (root / 'wexin-read-mcp/src').mkdir(parents=True)
                     (root / 'wexin-read-mcp/src/server.py').touch()
+                return subprocess.CompletedProcess(args, 0, install.MCP_REVISION)
             with patch('install.shutil.which', return_value='git'), patch('install.subprocess.run', side_effect=fake_run) as run, contextlib.redirect_stdout(io.StringIO()):
                 install.install(root)
             commands = [c.args[0] for c in run.call_args_list]
             self.assertEqual(commands[1][:2], ['git', 'clone'])
+            self.assertIn(['git', '-C', str(root / 'wexin-read-mcp'), 'checkout', '--detach', install.MCP_REVISION], commands)
             self.assertFalse(any('venv' in c for c in commands))
+
+    def test_existing_different_mcp_is_not_overwritten(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            mcp = root / 'wexin-read-mcp'
+            mcp.mkdir()
+            sentinel = mcp / 'user-edits.txt'
+            sentinel.write_text('keep me', encoding='utf-8')
+            with patch('install.shutil.which', return_value='git'), patch('install.subprocess.run', return_value=subprocess.CompletedProcess([], 0, 'different-revision')) as run:
+                with self.assertRaisesRegex(RuntimeError, 'left unchanged'):
+                    install.install(root)
+            self.assertEqual(sentinel.read_text(encoding='utf-8'), 'keep me')
+            commands = [c.args[0] for c in run.call_args_list]
+            self.assertFalse(any('checkout' in c or 'pip' in c for c in commands))
 
     def test_failure_stops_before_browser_install_or_success(self):
         with tempfile.TemporaryDirectory() as directory, patch('install.shutil.which', return_value='git'), patch('install.subprocess.run', side_effect=subprocess.CalledProcessError(7, 'fixture')), contextlib.redirect_stdout(io.StringIO()) as output:
@@ -107,6 +123,33 @@ class RuntimeTests(unittest.TestCase):
             self.assertFalse(check_env.check_notebooklm_auth())
             self.assertEqual(run.call_args.args[0], ['notebooklm', 'list'])
             self.assertEqual(run.call_args.kwargs['encoding'], 'utf-8')
+
+    def test_broken_commands_are_not_reported_installed(self):
+        failures = [subprocess.CompletedProcess([], 7, '', 'broken fixture'),
+                    OSError('broken executable'), subprocess.TimeoutExpired('fixture', 5)]
+        for failure in failures:
+            kwargs = {'side_effect': failure} if isinstance(failure, Exception) else {'return_value': failure}
+            with patch('shutil.which', return_value='fixture'), patch('subprocess.run', **kwargs), contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertFalse(check_env.check_command('fixture'))
+            self.assertNotIn('已安装', output.getvalue())
+
+    def test_upload_selects_created_notebook_and_stops_on_failure(self):
+        for codes in [(0, 0), (7,), (0, 7)]:
+            results = [subprocess.CompletedProcess([], code, '', 'fixture failure' if code else '') for code in codes]
+            with patch('main.subprocess.run', side_effect=results) as run, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(main.upload_to_notebooklm('中文 space.md', '中文 title'), codes == (0, 0))
+            self.assertEqual(run.call_args_list[0].args[0], ['notebooklm', 'create', '中文 title', '--use'])
+            self.assertEqual(run.call_count, len(codes))
+
+    def test_document_upload_failure_returns_nonzero(self):
+        with tempfile.TemporaryDirectory() as directory:
+            doc = Path(directory) / 'synthetic 中文.md'
+            doc.write_text('synthetic test only', encoding='utf-8')
+            for flags in [[], ['--deep-analysis']]:
+                with patch('main.sys.argv', ['main.py', str(doc), *flags]), patch('main.upload_to_notebooklm', return_value=False), contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(SystemExit) as error:
+                        main.main()
+                    self.assertEqual(error.exception.code, 1)
 
     def test_deep_analysis_writes_portable_path_with_invalid_title(self):
         with tempfile.TemporaryDirectory() as directory:

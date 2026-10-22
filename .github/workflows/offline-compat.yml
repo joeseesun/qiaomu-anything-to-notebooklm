@@ -1,4 +1,4 @@
-name: Offline compatibility
+name: Installation compatibility
 on:
   push:
     branches: [main, 'fix/windows-*']
@@ -13,10 +13,30 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python: ['3.10', '3.13']
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: checkout 中文 space
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: checkout 中文 space
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - name: Offline fixtures and native launcher smoke tests
         run: python -m unittest discover -s tests -v
+      - name: Install through native Windows launcher
+        if: runner.os == 'Windows'
+        run: .\install.cmd
+      - name: Install real dependencies and Chromium on Linux
+        if: runner.os != 'Windows'
+        run: python install.py
+      - name: Installed stack with synthetic files and empty auth
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            .venv/Scripts/python.exe tests/smoke_installed.py
+          else
+            .venv/bin/python tests/smoke_installed.py
+          fi

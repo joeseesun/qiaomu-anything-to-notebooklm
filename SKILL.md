@@ -273,7 +273,7 @@ Claude 自动识别输入类型：
 调用 `notebooklm` skill：
 
 ```bash
-notebooklm create "{title}"  # 创建新笔记本
+notebooklm create "{title}" --use  # 创建并选中新笔记本（notebooklm-py 0.8.5）
 notebooklm source add /tmp/weixin_xxx.txt --title "{title}"  # 上传文件
 ```
 

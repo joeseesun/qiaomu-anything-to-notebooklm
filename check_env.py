@@ -35,11 +35,11 @@ def check_python_version():
     version = sys.version_info
     version_str = f"{version.major}.{version.minor}.{version.micro}"
 
-    if version.major >= 3 and version.minor >= 9:
+    if version >= (3, 10):
         print_status("ok", f"Python {version_str}")
         return True
     else:
-        print_status("error", f"Python {version_str} (需要 3.9+)")
+        print_status("error", f"Python {version_str} (需要 3.10+)")
         return False
 
 def check_module(module_name, import_name=None):
@@ -67,10 +67,14 @@ def check_command(cmd):
                                   capture_output=True,
                                   encoding='utf-8', errors='replace',
                                   timeout=5)
+            if result.returncode != 0:
+                print_status("error", f"{cmd} 无法运行: {result.stderr.strip()}")
+                return False
             version = result.stdout.split('\n')[0] if result.stdout else "unknown"
             print_status("ok", f"{cmd} 已安装 ({version})")
-        except:
-            print_status("ok", f"{cmd} 已安装")
+        except (OSError, subprocess.TimeoutExpired) as error:
+            print_status("error", f"{cmd} 无法运行: {error}")
+            return False
         return True
     else:
         print_status("error", f"{cmd} 未找到")
@@ -124,7 +128,7 @@ def check_notebooklm_auth():
             print_status("ok", "NotebookLM 已认证")
             return True
         else:
-            print_status("warning", "NotebookLM 未认证（请运行 notebooklm login）")
+            print_status("warning", f"NotebookLM list 失败（请先检查以下错误，再决定是否登录）: {result.stderr.strip()}")
             return False
     except subprocess.TimeoutExpired:
         print_status("warning", "NotebookLM 认证检查超时")

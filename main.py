@@ -75,7 +75,7 @@ def upload_to_notebooklm(file_path, title):
     """上传文件到 NotebookLM"""
     # 创建笔记本
     result = subprocess.run(
-        ['notebooklm', 'create', title],
+        ['notebooklm', 'create', title, '--use'],
         capture_output=True,
         encoding='utf-8', errors='replace'
     )
@@ -349,6 +349,8 @@ def main():
 
         if deep_mode:
             result = deep_analysis(txt_path, title, input_type)
+            if not result:
+                sys.exit(1)
             if result:
                 # 保存结果到文件
                 output_file = analysis_output_path(title)
@@ -356,7 +358,8 @@ def main():
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, title)
+            if not upload_to_notebooklm(txt_path, title):
+                sys.exit(1)
 
     elif input_type == 'document':
         doc_path = Path(input_arg).expanduser()
@@ -366,13 +369,16 @@ def main():
 
         if deep_mode:
             result = deep_analysis(str(doc_path), title, input_type)
+            if not result:
+                sys.exit(1)
             if result:
                 output_file = analysis_output_path(title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(str(doc_path), title)
+            if not upload_to_notebooklm(str(doc_path), title):
+                sys.exit(1)
 
     elif input_type == 'podcast':
         print(f"🎙️ 处理播客/视频: {input_arg}")
@@ -403,6 +409,8 @@ def main():
 
         if deep_mode:
             result_data = deep_analysis(txt_path, title, 'podcast')
+            if not result_data:
+                sys.exit(1)
             if result_data:
                 safe_title = re.sub(r'[：:/\\?|<>*"\']', '_', title).strip('_')[:60]
                 output_file = analysis_output_path(safe_title)
@@ -410,7 +418,8 @@ def main():
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, title)
+            if not upload_to_notebooklm(txt_path, title):
+                sys.exit(1)
 
     elif input_type == 'x_twitter':
         print(f"🐦 处理 X/Twitter: {input_arg}")
@@ -456,13 +465,16 @@ def main():
 
         if deep_mode:
             result_data = deep_analysis(txt_path, safe_title, 'x_twitter')
+            if not result_data:
+                sys.exit(1)
             if result_data:
                 output_file = analysis_output_path(safe_title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, safe_title)
+            if not upload_to_notebooklm(txt_path, safe_title):
+                sys.exit(1)
 
     elif input_type == 'url':
         print(f"🌐 处理 URL: {input_arg}")
