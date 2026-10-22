@@ -162,6 +162,42 @@ cd qiaomu-anything-to-notebooklm
 # 3. 按提示配置 MCP，然后重启 Claude Code
 ```
 
+### Windows：PowerShell / CMD
+
+安装 Python **3.10+** 和 Git for Windows，然后在仓库目录的终端中运行：
+
+```powershell
+.\install.cmd
+```
+
+安装器依次检测 `py -3`、`python`、`python3`，检查真实 Python 版本（避开不可用的 Windows Store 别名）。依赖与 Chromium 下载到仓库内的 `.venv`，无需修改全局 Python 或 PATH。安装期间不登录、不读取凭据、不上传内容；失败会保留错误和非零退出码，请在终端中运行以便查看日志。
+
+此入口安装 `notebooklm-py[browser]>=0.8.5,<0.9`，并将新下载的微信 MCP 固定在 Playwright 版本 `e6d3bf594349eb29e4e7031b500dd82a4cb97e49`；其新版需要另装 `agent-browser`/`url-md`，不属于本安装器的依赖链。已有 MCP 若使用其他提交，安装器会停止并保留原文件，请先将该目录移到备份位置再重试，不会自动重置用户改动。
+
+按安装器打印的 JSON **手动**配置 MCP：使用 `.venv\Scripts\python.exe` 的绝对路径和 `PLAYWRIGHT_BROWSERS_PATH`，JSON 已正确转义 Windows 路径。随后重启 Claude Code。
+
+```powershell
+# 以下认证命令由用户在准备好时自行运行
+.\run.cmd notebooklm login
+.\run.cmd notebooklm list
+.\run.cmd check-env
+
+# 路径包含空格时加引号，使用安装时的同一环境
+.\run.cmd "C:\Users\me\Documents\notes.pdf"
+.\run.cmd "C:\Users\me\Documents\book.epub" --deep-analysis
+.\run.cmd --help
+```
+
+CMD 使用相同命令（也可以省略 `.\`）。`run.cmd notebooklm <参数>` 可调用本地 NotebookLM CLI，无需激活虚拟环境。深度分析 JSON 保存到系统临时目录（Windows 的 `%TEMP%`）。仅 Windows 入口使用这个本地环境；macOS/Linux 原有安装方式不变。
+
+`main.py` 的文件/普通网页/播客入口可使用上述运行方式；播客仍需用户自行配置 Get笔记，EPUB 需要 `ebooklib`（安装器会安装）。X/Twitter 的 Bash 抓取链路需在 WSL 中使用。Office/OCR/音频等转换仍按 Skill 的现有 `markitdown` 工作流执行，不属于 `main.py` 已实现的自动分支。
+
+本地文件上传会通过 `create --use` 将新笔记本设为当前上下文，随后添加来源；创建或上传失败会返回非零退出码。普通网页入口使用当前笔记本，使用前可运行 `.\run.cmd notebooklm use <id>`。深度分析仍沿用现有来源处理等待逻辑，不保证大文件在固定等待时间内完成处理。
+
+编码兼容基于 [rice5 的社区 PR #5](https://github.com/joeseesun/qiaomu-anything-to-notebooklm/pull/5)，并扩展到 stderr 和运行入口。离线测试：`python -m unittest discover -s tests -v`，含分享包解包后的模块导入回归。安装后可运行 `.venv\Scripts\python.exe tests\smoke_installed.py`：检查真实依赖、Chromium 合成页面、合成 EPUB/HTML 转换、MCP 初始化与工具列表，以及空认证目录下的失败退出码；不调用微信抓取，不登录或实际上传。Windows/Linux × Python 3.10/3.13 CI 执行这两层测试。Windows CI 是托管 runner，不代表用户 Windows 真机验收。
+
+若出现反复登录或空 source ID（[#2](https://github.com/joeseesun/qiaomu-anything-to-notebooklm/issues/2)），先记录 `.\run.cmd notebooklm --version`、使用的笔记本 ID、`source add` 与后续等待命令及脱敏错误输出，区分认证失败、参数不兼容和来源尚未处理完成。`check-env` 会保留 `list` 的错误信息，不将所有失败统一判断为未登录。请勿提供 cookies、令牌或 `storage_state.json`；本修复未验证解决反复认证，也未更换认证方式。
+
 ### 首次使用
 
 ```bash

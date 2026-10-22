@@ -23,15 +23,13 @@ echo ""
 # 1. 检查 Python 版本
 echo -e "${YELLOW}[1/6] 检查 Python 环境...${NC}"
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ 未找到 Python3，请先安装 Python 3.9+${NC}"
+    echo -e "${RED}❌ 未找到 Python3，请先安装 Python 3.10+${NC}"
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-REQUIRED_VERSION="3.9"
-
-if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
-    echo -e "${RED}❌ Python 版本过低（当前 $PYTHON_VERSION，需要 3.9+）${NC}"
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
+    echo -e "${RED}❌ Python 版本过低（当前 $PYTHON_VERSION，需要 3.10+）${NC}"
     exit 1
 fi
 

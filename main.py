@@ -12,6 +12,9 @@ import json
 import time
 import re
 from pathlib import Path
+from runtime_compat import configure_console
+
+configure_console()
 
 def detect_input_type(input_path):
     """检测输入类型"""
@@ -72,9 +75,9 @@ def upload_to_notebooklm(file_path, title):
     """上传文件到 NotebookLM"""
     # 创建笔记本
     result = subprocess.run(
-        ['notebooklm', 'create', title],
+        ['notebooklm', 'create', title, '--use'],
         capture_output=True,
-        text=True
+        encoding='utf-8', errors='replace'
     )
 
     if result.returncode != 0:
@@ -85,7 +88,7 @@ def upload_to_notebooklm(file_path, title):
     result = subprocess.run(
         ['notebooklm', 'source', 'add', file_path, '--title', title],
         capture_output=True,
-        text=True
+        encoding='utf-8', errors='replace'
     )
 
     if result.returncode != 0:
@@ -187,7 +190,7 @@ def ask_notebooklm(question, max_retries=1):
         result = subprocess.run(
             ['notebooklm', 'ask', question],
             capture_output=True,
-            text=True
+            encoding='utf-8', errors='replace'
         )
 
         if result.returncode == 0:
@@ -230,7 +233,7 @@ def create_feishu_doc(title, markdown_content):
     result = subprocess.run(
         ['lark-cli', 'docs', '+create', '--title', title, '--markdown', markdown_content],
         capture_output=True,
-        text=True
+        encoding='utf-8', errors='replace'
     )
 
     if result.returncode != 0:
@@ -312,7 +315,16 @@ def deep_analysis(file_path, title, content_type, to_feishu=False):
 
     return result
 
+def analysis_output_path(title):
+    """Use the OS temporary directory and a valid Windows filename."""
+    safe_title = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', title).strip(' .')[:60] or 'content'
+    return str(Path(tempfile.gettempdir()) / f"{safe_title}_analysis.json")
+
+
 def main():
+    if len(sys.argv) == 2 and sys.argv[1] in ('--help', '-h'):
+        print("用法: main.py <输入路径或URL> [--deep-analysis] [--to-feishu]")
+        return
     if len(sys.argv) < 2:
         print("用法: main.py <输入路径或URL> [--deep-analysis] [--to-feishu]", file=sys.stderr)
         sys.exit(1)
@@ -337,14 +349,17 @@ def main():
 
         if deep_mode:
             result = deep_analysis(txt_path, title, input_type)
+            if not result:
+                sys.exit(1)
             if result:
                 # 保存结果到文件
-                output_file = f"/tmp/{title}_analysis.json"
+                output_file = analysis_output_path(title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, title)
+            if not upload_to_notebooklm(txt_path, title):
+                sys.exit(1)
 
     elif input_type == 'document':
         doc_path = Path(input_arg).expanduser()
@@ -354,13 +369,16 @@ def main():
 
         if deep_mode:
             result = deep_analysis(str(doc_path), title, input_type)
+            if not result:
+                sys.exit(1)
             if result:
-                output_file = f"/tmp/{title}_analysis.json"
+                output_file = analysis_output_path(title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(str(doc_path), title)
+            if not upload_to_notebooklm(str(doc_path), title):
+                sys.exit(1)
 
     elif input_type == 'podcast':
         print(f"🎙️ 处理播客/视频: {input_arg}")
@@ -368,8 +386,8 @@ def main():
 
         script = os.path.join(os.path.dirname(__file__), 'scripts', 'get_podcast_transcript.py')
         result = subprocess.run(
-            ['python3', script, input_arg],
-            capture_output=True, text=True
+            [sys.executable, '-X', 'utf8', script, input_arg],
+            capture_output=True, encoding='utf-8', errors='replace'
         )
 
         if result.returncode != 0:
@@ -391,23 +409,30 @@ def main():
 
         if deep_mode:
             result_data = deep_analysis(txt_path, title, 'podcast')
+            if not result_data:
+                sys.exit(1)
             if result_data:
                 safe_title = re.sub(r'[：:/\\?|<>*"\']', '_', title).strip('_')[:60]
-                output_file = f"/tmp/{safe_title}_analysis.json"
+                output_file = analysis_output_path(safe_title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, title)
+            if not upload_to_notebooklm(txt_path, title):
+                sys.exit(1)
 
     elif input_type == 'x_twitter':
         print(f"🐦 处理 X/Twitter: {input_arg}")
         print("   通过代理级联获取推文内容...")
 
+        if os.name == 'nt':
+            print('X/Twitter 抓取需要 Bash 环境，请在 WSL 中使用此功能。', file=sys.stderr)
+            sys.exit(1)
+
         fetch_script = os.path.join(os.path.dirname(__file__), 'scripts', 'fetch_url.sh')
         result = subprocess.run(
             ['bash', fetch_script, input_arg],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, encoding='utf-8', errors='replace', timeout=60
         )
 
         if result.returncode != 0:
@@ -440,13 +465,16 @@ def main():
 
         if deep_mode:
             result_data = deep_analysis(txt_path, safe_title, 'x_twitter')
+            if not result_data:
+                sys.exit(1)
             if result_data:
-                output_file = f"/tmp/{safe_title}_analysis.json"
+                output_file = analysis_output_path(safe_title)
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
                 print(f"\n✅ 分析完成！结果已保存到: {output_file}")
         else:
-            upload_to_notebooklm(txt_path, safe_title)
+            if not upload_to_notebooklm(txt_path, safe_title):
+                sys.exit(1)
 
     elif input_type == 'url':
         print(f"🌐 处理 URL: {input_arg}")
@@ -454,7 +482,7 @@ def main():
         # 添加 URL 作为 source
         result = subprocess.run(
             ['notebooklm', 'source', 'add', input_arg],
-            capture_output=True, text=True
+            capture_output=True, encoding='utf-8', errors='replace'
         )
         if result.returncode != 0:
             print(f"❌ 添加失败: {result.stderr}", file=sys.stderr)
@@ -495,7 +523,7 @@ def main():
                 md = format_feishu_markdown(title, all_questions, all_answers)
                 create_feishu_doc(f"{title} - 深度解读", md)
 
-            output_file = f"/tmp/{title}_analysis.json"
+            output_file = analysis_output_path(title)
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(result_data, f, ensure_ascii=False, indent=2)
             print(f"\n✅ 分析完成！结果已保存到: {output_file}")

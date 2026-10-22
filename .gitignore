@@ -51,3 +51,6 @@ temp/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Local Windows installer environment
+.venv/

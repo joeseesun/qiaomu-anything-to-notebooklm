@@ -8,6 +8,10 @@ import os
 import json
 from pathlib import Path
 
+from runtime_compat import configure_console
+
+configure_console()
+
 # 颜色输出
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
@@ -31,11 +35,11 @@ def check_python_version():
     version = sys.version_info
     version_str = f"{version.major}.{version.minor}.{version.micro}"
 
-    if version.major >= 3 and version.minor >= 9:
+    if version >= (3, 10):
         print_status("ok", f"Python {version_str}")
         return True
     else:
-        print_status("error", f"Python {version_str} (需要 3.9+)")
+        print_status("error", f"Python {version_str} (需要 3.10+)")
         return False
 
 def check_module(module_name, import_name=None):
@@ -61,12 +65,16 @@ def check_command(cmd):
         try:
             result = subprocess.run([cmd, "--version"],
                                   capture_output=True,
-                                  text=True,
+                                  encoding='utf-8', errors='replace',
                                   timeout=5)
+            if result.returncode != 0:
+                print_status("error", f"{cmd} 无法运行: {result.stderr.strip()}")
+                return False
             version = result.stdout.split('\n')[0] if result.stdout else "unknown"
             print_status("ok", f"{cmd} 已安装 ({version})")
-        except:
-            print_status("ok", f"{cmd} 已安装")
+        except (OSError, subprocess.TimeoutExpired) as error:
+            print_status("error", f"{cmd} 无法运行: {error}")
+            return False
         return True
     else:
         print_status("error", f"{cmd} 未找到")
@@ -81,7 +89,7 @@ def check_mcp_config():
         return False
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
 
         if "mcpServers" in config and "weixin-reader" in config["mcpServers"]:
@@ -113,14 +121,14 @@ def check_notebooklm_auth():
     try:
         result = subprocess.run(["notebooklm", "list"],
                               capture_output=True,
-                              text=True,
+                              encoding='utf-8', errors='replace',
                               timeout=10)
 
         if result.returncode == 0:
             print_status("ok", "NotebookLM 已认证")
             return True
         else:
-            print_status("warning", "NotebookLM 未认证（请运行 notebooklm login）")
+            print_status("warning", f"NotebookLM list 失败（请先检查以下错误，再决定是否登录）: {result.stderr.strip()}")
             return False
     except subprocess.TimeoutExpired:
         print_status("warning", "NotebookLM 认证检查超时")
@@ -207,7 +215,7 @@ def main():
 
     if passed < total:
         print("💡 修复建议：")
-        print("  1. 运行安装脚本：./install.sh")
+        print("  1. 运行安装脚本：" + ("install.cmd" if os.name == "nt" else "./install.sh"))
         print("  2. 配置 MCP：编辑 ~/.claude/config.json")
         print("  3. 认证 NotebookLM：notebooklm login")
         print()
